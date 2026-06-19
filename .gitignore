@@ -6,6 +6,7 @@ __pycache__/
 
 # generované výstupy (MIDI)
 outputs_*/
+gallery/
 concept/evans_melody_gen/outputs/
 
 # trénovací data (přepisy B. Evanse – autorská práva, nepublikovat)

@@ -27,6 +27,7 @@ CONCEPT = os.path.join(HERE, "..", "concept", "evans_melody_gen")
 sys.path.insert(0, CONCEPT); sys.path.insert(0, os.path.join(CONCEPT, "src"))
 
 from evans_drill import load_notes, PC, nm
+from harmony import detect_progression
 from voicings import generate_voicings, render as render_harmony
 from melody_top import (make_melody, render as render_full, declash,
                         break_repeats, MLO, MHI)
@@ -91,9 +92,9 @@ def auto_form(progression, block=4):
 def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1):
     name = os.path.splitext(os.path.basename(path))[0][:40]
     notes = load_notes(path)
-    prog = progression_per_bar(notes, bar=4.0, max_bars=bars)
+    prog, key = detect_progression(notes, bar=4.0, max_bars=bars)
     form = auto_form(prog)
-    print(f"  {len(prog)} taktu, forma: {''.join(form)}")
+    print(f"  tonina: {key} | {len(prog)} taktu, forma: {''.join(form)}")
     print("  progrese: " + " | ".join(f"{PC[r]}{q}" for r, q in prog))
     voic = generate_voicings(prog, color=False, center=60)
     out_dir = out_dir or os.path.join(HERE, "..", "outputs_arr")
@@ -110,7 +111,7 @@ def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1):
         render_full(prog, voic, line, om, bpm=bpm); outs.append(om)
     for o in outs:
         print(f"  -> {o}")
-    return outs
+    return {"outs": outs, "key": key, "prog": prog, "form": form}
 
 
 if __name__ == "__main__":

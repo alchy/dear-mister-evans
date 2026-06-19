@@ -68,10 +68,16 @@ def break_repeats(melody, progression, bpc=4.0):
         ci = min(int(o // bpc), len(progression) - 1)
         r, q = progression[ci]
         scl = scale_pitches(r, q, MLO - 3, MHI)
+        is_db = (o - ci * bpc) < 0.3
         last = out[-1][2] if out else None
         last2 = out[-2][2] if len(out) >= 2 else None
         if p == last or p == last2:
-            alts = [x for x in scl if x != last and x != last2]
+            # na tezke dobe ber nahradu z AKORDOVYCH tonu (drz harmonii),
+            # jinak ze stupnice
+            pool = chord_tone_pitches(r, q, MLO - 3, MHI) if is_db else scl
+            alts = [x for x in pool if x != last and x != last2]
+            if not alts:
+                alts = [x for x in scl if x != last and x != last2]
             if alts:
                 ref = last if last is not None else p
                 p = min(alts, key=lambda x: (abs(x - ref), abs(x - p)))
@@ -122,16 +128,19 @@ def declash(melody, voicings, progression, bpc=4.0):
         cts = chord_tone_pitches(r, q, MLO - 3, MHI)
         scl = scale_pitches(r, q, MLO - 3, MHI)
         voic = voicings[ci][1] if ci < len(voicings) else []
+        is_db = (o - ci * bpc) < 0.3          # nota na "1" akordu
         def clashes(x):
             return any((x - v) % 12 in (1, 11) for v in voic)
         # dlouhy ton -> akordovy ton
         if d >= 1.0 and p % 12 not in {c % 12 for c in cts}:
             p = min(cts, key=lambda x: abs(x - p)) if cts else p
-        # m2/m9 stret s compem -> nejblizsi nestretovy ton stupnice
+        # m2/m9 stret s compem -> na tezke dobe z AKORDOVYCH tonu, jinak ze stupnice
         if d >= 0.4 and clashes(p):
-            alt = [x for x in scl if not clashes(x)]
-            if alt:
-                p = min(alt, key=lambda x: abs(x - p))
+            pool = [x for x in (cts if is_db else scl) if not clashes(x)]
+            if not pool:
+                pool = [x for x in scl if not clashes(x)]
+            if pool:
+                p = min(pool, key=lambda x: abs(x - p))
         out.append((o, d, p))
     return out
 

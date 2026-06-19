@@ -89,6 +89,8 @@ Volby `arrange.py`:
 ```
 improved/
   arrange.py       # DIRIGENT: libovolné MIDI -> Evansovská aranž (kroky 1-4)
+  harmony.py       # key-aware detekce akordů (odhad tóniny + diatonický prior + Viterbi)
+  gallery.py       # dávkové zpracování vybraných standardů do gallery/
   voicings.py      # rootless voicingy + voice-leading (levá ruka)
   melody_top.py    # melodie na harmonické kostře + pojistky (pravá ruka)
   motif.py         # motivická návratnost (téma se vrátí)
