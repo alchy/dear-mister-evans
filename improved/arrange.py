@@ -89,8 +89,8 @@ def auto_form(progression, block=4):
     return labels
 
 
-def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1):
-    name = os.path.splitext(os.path.basename(path))[0][:40]
+def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1, name=None):
+    name = name or os.path.splitext(os.path.basename(path))[0][:40]
     notes = load_notes(path)
     prog, key = detect_progression(notes, bar=4.0, max_bars=bars)
     form = auto_form(prog)
