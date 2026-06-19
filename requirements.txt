@@ -1,0 +1,6 @@
+# jádro – detekce akordů, generování, MIDI
+mido>=1.3
+numpy>=1.21
+
+# přehrávání MIDI do portu (player.py); volitelné
+python-rtmidi>=1.5

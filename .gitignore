@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# generované výstupy (MIDI)
+outputs_*/
+concept/evans_melody_gen/outputs/
+
+# trénovací data (přepisy B. Evanse – autorská práva, nepublikovat)
+concept/evans_melody_gen/data/*.mid
+concept/evans_melody_gen/data/*.midi
+
+# OS
+.DS_Store
+Thumbs.db

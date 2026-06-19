@@ -1,0 +1,6 @@
+Sem patří trénovací MIDI (be-slice*.mid).
+
+Přepisy Billa Evanse nejsou ve veřejném repu kvůli autorským právům.
+Hlavní nástroj `improved/arrange.py` data nepotřebuje – funguje na libovolném
+MIDI, které mu dáš. Tato složka je relevantní jen pro starší Markov/frázové
+experimenty (melody_v2.py, phrases_v3.py).

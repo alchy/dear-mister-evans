@@ -1,0 +1,6 @@
+# Markovův baseline + lešení (povinné)
+mido>=1.3
+numpy>=1.21
+
+# Volitelné: jen pro experimentální neuronku v src/nn_baseline.py
+# torch>=2.0
