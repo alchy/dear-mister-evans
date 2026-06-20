@@ -11,7 +11,6 @@ je DRY — stejná funkce pro bas i melodii. Layout je fixní (žádné přeskak
 Spuštění:  python improved/gui.py
 """
 import os, sys, threading, tempfile, traceback
-from collections import defaultdict
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 
@@ -184,18 +183,25 @@ class App:
         return x0 + whites(lo, m) * WW + WW / 2
 
     def _seq(self, cv, x0, ky, lo, hi, seq, color):
-        """DRY: vykresli posloupnost tónů jako očíslovaná kolečka (pořadí stisku).
-        Opakovaný tón -> víc koleček naskládaných nad sebou."""
-        bykey = defaultdict(list)
-        for i, p in enumerate(seq, start=1):
-            pp = max(lo, min(hi, p)); bykey[pp].append(i)
-        for p, nums in bykey.items():
+        """DRY: posloupnost tónů jako očíslovaná kolečka v pořadí hraní.
+        Drží výškovou dráhu po dobu jednoho směrového běhu; při OPAKOVÁNÍ tónu
+        nebo ZMĚNĚ SMĚRU poskočí další kolečko o patro výš (po MAXL patrech se
+        přetočí dolů, ať to nepřeteče)."""
+        STEP, MAXL = 11, 3
+        level, prevdir = 0, 0
+        for i, p in enumerate(seq):
+            if i > 0:
+                prev = seq[i - 1]
+                d = (p > prev) - (p < prev)
+                if p == prev or (d != 0 and prevdir != 0 and d != prevdir):
+                    level = level + 1 if level < MAXL else 0
+                if d != 0:
+                    prevdir = d
             cx = self._cx(x0, lo, hi, p)
             base = ky + (BH - 7 if p % 12 in BLACK_PC else WH - 9)
-            for j, n in enumerate(nums):
-                cy = base - j * 13
-                cv.create_oval(cx - 7, cy - 7, cx + 7, cy + 7, fill=color, outline="#333")
-                cv.create_text(cx, cy, text=str(n), fill="white", font=("Segoe UI", 7, "bold"))
+            cy = base - level * STEP
+            cv.create_oval(cx - 7, cy - 7, cx + 7, cy + 7, fill=color, outline="#333")
+            cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 7, "bold"))
 
     # ---------- náhled progrese ----------
     def draw_progression(self):
