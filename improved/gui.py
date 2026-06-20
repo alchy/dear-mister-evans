@@ -403,8 +403,8 @@ class App:
         self.worker = threading.Thread(target=run, daemon=True); self.worker.start()
 
     def _set_playing(self, row, kind="line"):
-        """Jemná zelená linka nad přehrávanou řádkou kláves (indikace přehrávání;
-        decentní, neukrajuje z layoutu). row=None linku zhasne."""
+        """Zelená linka POD přehrávanou řádkou kláves (indikace přehrávání; decentní,
+        neukrajuje z layoutu). row=None linku zhasne. Volat z hlavního threadu."""
         cv = getattr(self, "kbd", None)
         if cv is None:
             return
@@ -412,8 +412,32 @@ class App:
         if row is None or not (0 <= row < len(getattr(self, "last_rows", []))):
             return
         ky = 8 + row * ROW_H + LBL
+        y = ky + WH + 2                                    # těsně pod klávesami (mimo popisek)
         x0, x1 = (0, self.bass_w) if kind == "chord" else (self.mel_x0, self.mel_x0 + self.mel_w)
-        cv.create_line(x0, ky - 3, x1, ky - 3, fill="#35c75a", width=2, tags="playline")
+        cv.create_line(x0, y, x1, y, fill="#10c040", width=3, tags="playline")
+
+    def _play_file_follow(self, path, nbars):
+        """GUI přehrává MIDI PŘÍMO a ze stejné smyčky (playhead) rozsvěcí zelenou
+        linku po taktech -> dokonalý sync (žádný odhad, žádný lead z otevírání portu).
+        Blokuje po dobu přehrávání -> volat z workeru. stop_event smyčku přeruší."""
+        import mido
+        name = self.port.get() or be.default_port()
+        if not name:
+            raise RuntimeError("Nenalezen žádný MIDI-out port.")
+        bar_s = 4 * 60.0 / max(1, self.bpm.get())          # takt = 4 doby
+        cur = -1; t = 0.0
+        with mido.open_output(name) as out:
+            for msg in mido.MidiFile(path).play():
+                if self.stop_event.is_set():
+                    break
+                t += msg.time                              # akumulovaný čas playheadu (s)
+                bar = int(t / bar_s)
+                if bar != cur and 0 <= bar < nbars:
+                    cur = bar
+                    self.root.after(0, lambda b=bar: self._set_playing(b, "line"))
+                out.send(msg)
+            for ch in range(16):                           # zhasni všechny tóny
+                out.send(mido.Message('control_change', channel=ch, control=123, value=0))
 
     # ---------- regenerace taktu + párový feedback (ladění modelu) ----------
     def _regen_bar(self, i):
@@ -482,7 +506,7 @@ class App:
         self.draw_progression(); self.status.set(f"Seed = {self.seed.get()}")
 
     def on_stop(self):
-        self.stop_event.set(); self.status.set("Stop.")
+        self.stop_event.set(); self._set_playing(None); self.status.set("Stop.")
 
     def on_play(self):
         if self.worker and self.worker.is_alive():
@@ -497,11 +521,13 @@ class App:
             self.status.set("Generuji…")
             _, used = be.generate(self.params(), self.preview)
             self.status.set("Hraji…  " + " ".join(u for u in used if u))
-            be.play(self.preview, port_name=self.port.get(), stop_event=self.stop_event)
+            self._play_file_follow(self.preview, len(self.last_rows))   # GUI hraje + sync linky
             if not self.stop_event.is_set():
                 self.status.set("Hotovo.  takty: " + " ".join(u for u in used if u))
         except Exception as e:
             traceback.print_exc(); self.status.set(f"Chyba: {e}")
+        finally:
+            self.root.after(0, lambda: self._set_playing(None))
 
     def on_export(self):
         path = filedialog.asksaveasfilename(
