@@ -73,9 +73,8 @@ if __name__ == "__main__":
         if a.no_melody:
             render_harmony(prog, voic, a.out, bpm=a.bpm)
         else:
-            line = generate_motivic(prog, auto_form(prog), bpc=4.0, seed=a.seed)
-            line = declash(line, voic, prog, bpc=4.0)
-            line = break_repeats(line, prog, bpc=4.0)
+            import melody_markov
+            line = melody_markov.finalize_melody(prog, voic, seed=a.seed)
             render_full(prog, voic, line, a.out, bpm=a.bpm)
         print(json.dumps({"output": a.out, "bars": len(prog)}, ensure_ascii=False))
     except Exception as e:

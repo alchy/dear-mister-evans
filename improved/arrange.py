@@ -104,9 +104,8 @@ def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1, name=No
     oh = os.path.join(out_dir, f"{name}__harmony.mid")
     render_harmony(prog, voic, oh, bpm=bpm); outs.append(oh)
     if melody:
-        line = generate_motivic(prog, form, bpc=4.0, seed=seed)
-        line = declash(line, voic, prog, bpc=4.0)
-        line = break_repeats(line, prog, bpc=4.0)
+        import melody_markov
+        line = melody_markov.finalize_melody(prog, voic, seed=seed)
         om = os.path.join(out_dir, f"{name}__full.mid")
         render_full(prog, voic, line, om, bpm=bpm); outs.append(om)
     for o in outs:
