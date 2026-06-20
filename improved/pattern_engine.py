@@ -157,6 +157,21 @@ def markov_line(spec, progression, model, rng):
     return line
 
 
+def limit_leaps(line, max_leap=9):
+    """Zploští velké melodické skoky (> velká sexta) o oktávu zpět do linky -> drží
+    pásmo, žádné 'útěky o oktávu'. Zachová tónovou třídu. Pak dorovná no_repeats."""
+    out = []
+    for t, d, p in line:
+        if out:
+            prev = out[-1][2]
+            while p - prev > max_leap:
+                p -= 12
+            while prev - p > max_leap:
+                p += 12
+        out.append((t, d, p))
+    return out
+
+
 def no_repeats(line):
     """Pojistka enginu: žádná nota se nikdy neopakuje 2× po sobě (i přes hranice
     taktů). Opakovaný tón posune o krok (přednostně celý tón ve směru pohybu)."""
@@ -181,7 +196,7 @@ def generate(spec, progression, model=None, seed=None):
     kind = spec.get("scale", "auto"); cell = spec["cell"]; ctype = cell["type"]
     dirmode = cell.get("dir", "alt")
     if ctype == "markov":
-        return no_repeats(markov_line(spec, progression, model, rng))
+        return no_repeats(limit_leaps(markov_line(spec, progression, model, rng)))
     line = []; prev_last = lo + 6
     for i, (r, q) in enumerate(progression):
         sc = scale_for(r, q, lo - 1, hi + 1, kind)
@@ -206,7 +221,7 @@ def generate(spec, progression, model=None, seed=None):
         for n, p in enumerate(pitches[:npb]):
             line.append((i * bpc + n / sub, (1.0 / sub) * 0.9, p))
         prev_last = pitches[-1] if pitches else prev_last
-    return no_repeats(line)
+    return no_repeats(limit_leaps(line))
 
 
 def _render(rh, progression, line, out, bpm, voicing="rootless"):
@@ -273,7 +288,7 @@ def synth_generate(recipe, progression, model=None, seed=None):
         for n, p in enumerate(pitches[:npb]):
             line.append((i * bpc + n / sub, (1.0 / sub) * 0.9, p))
         prev_last = pitches[-1] if pitches else prev_last
-    return no_repeats(line), used
+    return no_repeats(limit_leaps(line)), used
 
 
 def synth_make(recipe, progression, out, bpm=110, model=None, seed=1):
