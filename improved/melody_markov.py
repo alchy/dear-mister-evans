@@ -13,7 +13,7 @@ NAUČENÝM lokálním pohybem + RYTMEM z Evansových přepisů:
 Tím se spojí: naučený styl (Markov) + soudržnost (kostra). Řeší starý problém
 v2 ("záblesky, ale nedrží"), protože strukturu teď drží kostra.
 """
-import os, sys, random
+import os, sys, random, pickle
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "concept", "evans_melody_gen"))
@@ -25,6 +25,7 @@ from voicings import generate_voicings
 from evans_drill import load_notes
 from line_extraction import extract_melody
 import glob
+import mido
 
 EVANS_DATA = os.path.join(HERE, "..", "concept", "evans_melody_gen", "data", "be-slice*.mid")
 JAZZ_ROOT = r"C:\Users\jindr\OneDrive\Jazz Learning"
@@ -85,8 +86,79 @@ def musicxml_notes(path):
     return notes
 
 
-def gather_files(source):
-    """source: 'evans' (jen be-slice) | 'all' (celá sbírka: 1 MIDI/složku + MusicXML)."""
+# ---------------------------------------------------------------------------
+# Band-aware extrakce: z kapelní aranže vytáhne jen vedoucí melodický hlas
+# (zahodí bicí kanál 10, bas, akordický comping podle "chordiness").
+# ---------------------------------------------------------------------------
+def load_notes_chan(path):
+    """Načte noty VČETNĚ kanálu + mapu kanál->program. -> ([(o,d,p,v,ch)], prog_of)."""
+    mid = mido.MidiFile(path); tpb = mid.ticks_per_beat or 480
+    notes = []; prog_of = {}
+    for tr in mid.tracks:
+        t = 0; active = {}
+        for m in tr:
+            t += m.time
+            if m.type == 'program_change':
+                prog_of[m.channel] = m.program
+            elif m.type == 'note_on' and m.velocity > 0:
+                active.setdefault((m.channel, m.note), []).append((t, m.velocity))
+            elif m.type == 'note_off' or (m.type == 'note_on' and m.velocity == 0):
+                k = (m.channel, m.note)
+                if active.get(k):
+                    st, v = active[k].pop(0)
+                    notes.append((st/tpb, max(0.01, (t-st)/tpb), m.note, v, m.channel))
+    return notes, prog_of
+
+
+def _chordiness(ns):
+    """Průměrný počet tónů na společný nástup (1 = monofonní melodie, >1.5 = akordy)."""
+    from collections import Counter
+    c = Counter(round(o * 4) / 4 for o, _, _ in ns)
+    return sum(c.values()) / max(1, len(c))
+
+
+def pick_melody_channel(notes, prog_of):
+    """Vybere kanál s vedoucí melodií: nejmonofoničtější, mid-high, ne bas/bicí."""
+    from collections import defaultdict
+    bychan = defaultdict(list)
+    for o, d, p, v, ch in notes:
+        if ch == 9:                      # bicí
+            continue
+        bychan[ch].append((o, d, p))
+    best, bestkey = None, None
+    for ch, ns in bychan.items():
+        if 32 <= prog_of.get(ch, 0) <= 39:   # basové programy
+            continue
+        if len(ns) < 8:
+            continue
+        meanp = sum(p for _, _, p in ns) / len(ns)
+        if not (54 <= meanp <= 92):
+            continue
+        key = (_chordiness(ns), -meanp, -len(ns))   # málo akordů, výš, víc not
+        if bestkey is None or key < bestkey:
+            bestkey, best = key, ch
+    return best
+
+
+def melody_from_midi(path):
+    """Vrátí melodickou linku [(o,d,p)] z (i kapelního) MIDI -- jen vedoucí hlas."""
+    notes, prog_of = load_notes_chan(path)
+    if not notes:
+        return []
+    ch = pick_melody_channel(notes, prog_of)
+    if ch is None:
+        sub = [(o, d, p, v) for o, d, p, v, c in notes if c != 9]
+    else:
+        sub = [(o, d, p, v) for o, d, p, v, c in notes if c == ch]
+    return extract_melody(sub) if sub else []
+
+
+EXTERNAL_DIR = os.path.join(HERE, "..", "data_external")   # midkar, bushgrafts, ...
+
+
+def gather_files(source, include_extra=True):
+    """source: 'evans' (jen be-slice) | 'all' (celá sbírka: 1 MIDI/složku +
+    MusicXML + cokoliv v data_external/, pokud je k dispozici)."""
     out = []
     if source == "evans":
         for f in sorted(glob.glob(EVANS_DATA)):
@@ -100,27 +172,41 @@ def gather_files(source):
             seen.add(d); out.append(('mid', f))
     for f in sorted(glob.glob(os.path.join(JAZZ_ROOT, "**", "*.musicxml"), recursive=True)):
         out.append(('xml', f))
+    # externí korpus(y): každý soubor je jiná skladba -> bez folder-dedupu
+    if include_extra and os.path.isdir(EXTERNAL_DIR):
+        for f in sorted(glob.glob(os.path.join(EXTERNAL_DIR, "**", "*.mid"), recursive=True)):
+            out.append(('mid', f))
     return out
 
 
-def train(source="evans", order=2, verbose=True):
-    files = gather_files(source)
+def _extract(kind, f):
+    if kind == 'mid':
+        return melody_from_midi(f)          # band-aware (jen vedoucí hlas)
+    notes = musicxml_notes(f)
+    return extract_melody(notes) if notes else []
+
+
+def train_files(files, order=2, verbose=True, label=""):
     model = MotionMarkov(order=order)
     ntok = used = 0
     for kind, f in files:
         try:
-            notes = load_notes(f) if kind == 'mid' else musicxml_notes(f)
-            if not notes:
+            mel = _extract(kind, f)
+            if not mel:
                 continue
-            toks = melody_to_tokens(extract_melody(notes))
+            toks = melody_to_tokens(mel)
             model.train_on(toks)
             ntok += sum(1 for t in toks if t is not None); used += 1
         except Exception:
             continue
     if verbose:
-        print(f"melodický Markov [{source}]: {used}/{len(files)} souborů, "
+        print(f"melodický Markov [{label or 'files'}]: {used}/{len(files)} souborů, "
               f"{ntok} tokenů pohybu+rytmu")
     return model
+
+
+def train(source="evans", order=2, verbose=True):
+    return train_files(gather_files(source), order, verbose, label=source)
 
 
 def learned_line(model, progression, bpc=4.0, mlo=MLO, mhi=MHI,
@@ -168,6 +254,57 @@ def arrange_learned(progression, out, bpm=110, temperature=1.0, seed=1, model=No
     line = declash(line, voic, progression, bpc=4.0)
     line = break_repeats(line, progression, bpc=4.0)
     render_full(progression, voic, line, out, bpm=bpm)
+    return line
+
+
+MODELS_DIR = os.path.join(HERE, "..", "models")
+
+
+def get_model(source="all"):
+    """Vrátí natrénovaný melodický model (z cache, jinak natrénuje a uloží).
+    None, pokud data nejsou k dispozici (-> fallback na pravidlovou melodii)."""
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    path = os.path.join(MODELS_DIR, f"melody_{source}.pkl")
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as fh:
+                m = pickle.load(fh)
+            if getattr(m, "starts", None):
+                return m
+        except Exception:
+            pass
+    try:
+        m = train(source, verbose=False)
+    except Exception:
+        return None
+    if not getattr(m, "starts", None):
+        return None
+    try:
+        with open(path, "wb") as fh:
+            pickle.dump(m, fh)
+    except Exception:
+        pass
+    return m
+
+
+def best_melody(progression, seed=1, temperature=1.0, source="all", bpc=4.0):
+    """Naučená melodie (pokud jsou data), jinak fallback na pravidlovou (motif)."""
+    model = get_model(source)
+    if model is not None:
+        try:
+            return learned_line(model, progression, temperature=temperature, seed=seed)
+        except Exception:
+            pass
+    from motif import generate_motivic
+    from arrange import auto_form
+    return generate_motivic(progression, auto_form(progression), bpc=bpc, seed=seed)
+
+
+def finalize_melody(progression, voic, seed=1, temperature=1.0, source="all", bpc=4.0):
+    """Hotová melodická linka (naučená/fallback) + declash + anti-opakování."""
+    line = best_melody(progression, seed=seed, temperature=temperature, source=source, bpc=bpc)
+    line = declash(line, voic, progression, bpc=bpc)
+    line = break_repeats(line, progression, bpc=bpc)
     return line
 
 
