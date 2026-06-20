@@ -144,6 +144,7 @@ class App:
 
         btns = ttk.Frame(frm); btns.grid(row=r, column=0, columnspan=4, sticky="we", pady=8)
         ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=3)
+        ttk.Button(btns, text="▶ Přehraj sekvenci", command=self.on_replay).pack(side="left", padx=3)
         ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=3)
         ttk.Button(btns, text="💾 Export…", command=self.on_export).pack(side="left", padx=3)
         ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3); r += 1
@@ -172,7 +173,7 @@ class App:
         self.kbd.bind("<Button-3>", self.on_kbd_rclick)    # pravý klik = "tahle je lepší" (feedback)
         ttk.Label(frm, foreground="#666",
                   text="● levá ruka (bas/akord)   ● melodie   čísla = pořadí stisku   — přesun hlasu"
-                  "\n(klaviatura: vlevo akord · vpravo linka · ↻ = regeneruj takt · pravý klik na ↻ = lepší → feedback)"
+                  "\n(↻ = regeneruj takt · pravý klik: na LINKU = ✓ dobrý segment (beze změny), na ↻ = lepší než předchozí)"
                   ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
     def _drop(self, frm, row, label, var, values, pad):
@@ -458,8 +459,10 @@ class App:
                         f"Pravý klik na ↻ = pošli jako LEPŠÍ.")
 
     def on_kbd_rclick(self, event):
-        """Pravý klik na ↻ (nebo melodickou linku) = aktuální takt je LEPŠÍ než
-        předchozí varianta -> párový feedback do modelu (B↑/A↓) + stdout."""
+        """Pravý klik = feedback do modelu, podle MÍSTA dvě jasná gesta:
+          - na melodické KLÁVESY = '✓ tento segment je dobrý' (absolutní potvrzení,
+            BEZ změny taktu),
+          - na ↻ = 'nová varianta je lepší než předchozí' (párové B↑/A↓ + bandit)."""
         rows = getattr(self, "last_rows", None)
         if not rows:
             return
@@ -470,19 +473,23 @@ class App:
         ky = 8 + i * ROW_H + LBL
         if not (ky <= y <= ky + WH):
             return
-        if not (self.mel_x0 <= x <= self.mel_regen + BTNW):   # jen melodická oblast + ↻
+        on_regen = self.mel_regen <= x <= self.mel_regen + BTNW
+        on_keys = self.mel_x0 <= x <= self.mel_x0 + self.mel_w
+        if not (on_regen or on_keys):
             return
         row = rows[i]; better = row.get("mel") or []
         if len(better) < 2:
             self.status.set("Prázdný takt — nelze poslat feedback."); return
-        prev = self.prev_variant.get(i)
-        worse = (prev or {}).get("mel")
+        if on_regen:                                       # ↻ = lepší než předchozí varianta
+            prev = self.prev_variant.get(i)
+            worse = (prev or {}).get("mel"); wcell = (prev or {}).get("cell")
+            kind = "lepší než předchozí" if worse else "👍 dobrý segment"
+        else:                                              # klávesy = potvrď dobrý segment (beze změny)
+            worse = None; wcell = None
+            kind = "✓ dobrý segment"
         sub = be._sub(self.params())
         try:
-            n = be.prefer_variant(better, worse, sub,
-                                  better_cell=row.get("cell"),
-                                  worse_cell=(prev or {}).get("cell"))
-            kind = "lepší než předchozí" if worse else "👍 (bez srovnání)"
+            n = be.prefer_variant(better, worse, sub, better_cell=row.get("cell"), worse_cell=wcell)
             self.status.set(f"Feedback ✓ takt {i + 1} ({kind}). Preferencí: {n}")
         except Exception as e:
             traceback.print_exc(); self.status.set(f"Chyba feedbacku: {e}")
@@ -520,10 +527,43 @@ class App:
         try:
             self.status.set("Generuji…")
             _, used = be.generate(self.params(), self.preview)
+            self._preview_key = self._params_key()         # preview je čerstvý -> Přehraj bude hned
             self.status.set("Hraji…  " + " ".join(u for u in used if u))
             self._play_file_follow(self.preview, len(self.last_rows))   # GUI hraje + sync linky
             if not self.stop_event.is_set():
                 self.status.set("Hotovo.  takty: " + " ".join(u for u in used if u))
+        except Exception as e:
+            traceback.print_exc(); self.status.set(f"Chyba: {e}")
+        finally:
+            self.root.after(0, lambda: self._set_playing(None))
+
+    # ---------- jen přehraj celou aktuální sekvenci (bez chápání jako "generuj") ----------
+    def _params_key(self):
+        return json.dumps(self.params(), sort_keys=True, ensure_ascii=False)
+
+    def _ensure_preview(self):
+        """Zajisti, že preview MIDI odpovídá AKTUÁLNÍMU stavu (vč. regenerací). Pokud
+        se od posledního renderu nic nezměnilo, nic negeneruje -> okamžité přehrání."""
+        key = self._params_key()
+        if getattr(self, "_preview_key", None) != key or not os.path.exists(self.preview):
+            be.generate(self.params(), self.preview)
+            self._preview_key = key
+
+    def on_replay(self):
+        if self.worker and self.worker.is_alive():
+            self.status.set("Už hraji — nejdřív Stop."); return
+        self.draw_progression()
+        self.stop_event.clear()
+        self.worker = threading.Thread(target=self._play_seq, daemon=True)
+        self.worker.start()
+
+    def _play_seq(self):
+        try:
+            self._ensure_preview()
+            self.status.set("Hraji sekvenci…")
+            self._play_file_follow(self.preview, len(self.last_rows))
+            if not self.stop_event.is_set():
+                self.status.set("Hotovo (celá sekvence).")
         except Exception as e:
             traceback.print_exc(); self.status.set(f"Chyba: {e}")
         finally:
