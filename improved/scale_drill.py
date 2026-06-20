@@ -112,21 +112,30 @@ def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=86, npb=8,
             continue
         idx = lambda p: min(range(len(scale)), key=lambda k: abs(scale[k] - p))
         gts = guide_pitches(r, q, rh_lo, rh_hi)
-        start = min(gts, key=lambda x: abs(x - prev_last)) if gts else scale[idx(prev_last)]
+        if gts:                                  # start dle směru: ↑ startuj dole, ↓ nahoře
+            span = rh_hi - rh_lo
+            if direction > 0:
+                zone = [g for g in gts if g <= rh_lo + span * 0.45] or gts
+            else:
+                zone = [g for g in gts if g >= rh_lo + span * 0.55] or gts
+            start = min(zone, key=lambda x: abs(x - prev_last))
+        else:
+            start = scale[idx(prev_last)]
         ci = idx(start)
         notes = [scale[ci]]
         for k in range(1, npb):
             move = direction * (2 if rng.random() < variation else 1)  # převážně krok, občas tercie
-            ni = ci + move
-            if not (0 <= ni < len(scale)):       # u kraje -> jen krok
-                ni = ci + direction
-            if not (0 <= ni < len(scale)):       # úplně na kraji -> jediný obrat (ne vzor)
-                ni = ci - direction
-            ni = max(0, min(len(scale) - 1, ni))
-            if scale[ni] == notes[-1]:           # neopakovat
-                ni = max(0, min(len(scale) - 1, ni + direction))
+            ni = max(0, min(len(scale) - 1, ci + move))
+            cand = scale[ni]
+            # anti opakování / anti a-b-a oscilace (to byl ten nejazzový vzor)
+            if cand == notes[-1] or (len(notes) >= 2 and cand == notes[-2]):
+                ni = max(0, min(len(scale) - 1, ci + direction * 2))   # skok dál ve směru
+                cand = scale[ni]
+                if cand == notes[-1] or (len(notes) >= 2 and cand == notes[-2]):
+                    ni = max(0, min(len(scale) - 1, ci - direction))   # u kraje jednorázový obrat
+                    cand = scale[ni]
             ci = ni
-            notes.append(scale[ci])
+            notes.append(cand)
         for k, p in enumerate(notes):
             line.append((i * bpc + k * (bpc / npb), (bpc / npb) * 0.92, p))
         prev_last = notes[-1]
@@ -134,11 +143,53 @@ def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=86, npb=8,
     return line
 
 
-def make_drill(progression, out, kind='auto', bpm=120, seed=1, model=None):
-    model = model or mm.get_model('evans')
+def render_drill(progression, voicings, line, out, bpm=116, bpc=4.0,
+                 swing=0.11, accents=True):
+    """Render drilu se SWING feelem: triolové dlouhá-krátká osminky + akcenty
+    (beat 1 = landing silnější, offbeaty lehčí). LH = bas + akord/takt (sustain)."""
+    import mido
+    tpb = 240
+    mid = mido.MidiFile(type=1); mid.ticks_per_beat = tpb
+    meta = mido.MidiTrack(); mid.tracks.append(meta)
+    meta.append(mido.MetaMessage('set_tempo', tempo=int(60000000/bpm), time=0))
+    meta.append(mido.MetaMessage('time_signature', numerator=4, denominator=4, time=0))
+    trB = mido.MidiTrack(); trC = mido.MidiTrack(); trD = mido.MidiTrack()
+    trB.append(mido.MetaMessage('track_name', name='Bass', time=0))
+    trC.append(mido.MetaMessage('track_name', name='Chords', time=0))
+    trD.append(mido.MetaMessage('track_name', name='Drill', time=0))
+    mid.tracks += [trB, trC, trD]
+    evB, evC, evD = [], [], []
+    for i, (bass, voic) in enumerate(voicings):
+        t0 = i * bpc
+        evB.append((t0, 1, [bass], 56)); evB.append((t0 + bpc*0.95, 0, [bass], 0))
+        evC.append((t0, 1, voic, 50)); evC.append((t0 + bpc*0.95, 0, voic, 0))
+    for o, d, p in line:
+        bf = o - int(o)                                  # pozice v rámci doby
+        offbeat = abs(bf - 0.5) < 1e-3
+        if offbeat:                                      # "a" -> swing pozdě, kratší, lehčí
+            on = o + swing; dur = max(0.12, 0.5 - swing); vel = 78 if accents else 90
+        else:                                            # doba -> delší, plnější
+            on = o; dur = 0.5 + swing * 0.8
+            vel = 104 if (accents and abs(o % bpc) < 1e-3) else (96 if accents else 90)
+        evD.append((on, 1, [p], vel)); evD.append((on + dur, 0, [p], 0))
+    for tr, ev in [(trB, evB), (trC, evC), (trD, evD)]:
+        flat = []
+        for tt, typ, ps, vel in ev:
+            for pp in ps:
+                flat.append((tt, typ, pp, vel))
+        flat.sort(key=lambda x: (x[0], x[1])); last = 0
+        for tt, typ, pp, vel in flat:
+            dt = max(0, int(round((tt - last) * tpb))); last = tt
+            tr.append(mido.Message('note_on' if typ else 'note_off',
+                                   note=int(max(1, min(127, pp))),
+                                   velocity=vel if typ else 0, time=dt))
+    mid.save(out)
+
+
+def make_drill(progression, out, kind='auto', bpm=120, seed=1, model=None, swing=0.11):
     voic = generate_voicings(progression, color=False, center=52)   # LH níž, dril nad
-    line = drill_line(progression, model, kind=kind, seed=seed)
-    render_full(progression, voic, line, out, bpm=bpm, comp="sustain")
+    line = drill_line(progression, kind=kind, seed=seed)
+    render_drill(progression, voic, line, out, bpm=bpm, swing=swing)
     return line
 
 
