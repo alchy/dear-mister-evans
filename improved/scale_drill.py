@@ -96,7 +96,7 @@ def _pick_near(cands, near, model, ctx, rng, temperature, avoid=None):
     return min(pool, key=lambda x: abs(x - target))
 
 
-def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=84, npb=8,
+def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=86, npb=8,
                bpc=4.0, variation=0.28, seed=None, start_dir=1):
     """Nahoru-dolů a jeho variace: takty se střídají vzestupně/sestupně.
     Každý takt běží jazzovou stupnici akordu v daném směru (s občasným skokem
@@ -116,14 +116,16 @@ def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=84, npb=8,
         ci = idx(start)
         notes = [scale[ci]]
         for k in range(1, npb):
-            roll = rng.random()
-            if roll < 1 - variation:       move = direction        # krok ve směru
-            elif roll < 1 - variation / 3: move = direction * 2     # skok (terc)
-            else:                          move = -direction        # krátký obrat (soused)
+            move = direction * (2 if rng.random() < variation else 1)  # převážně krok, občas tercie
             ni = ci + move
-            if ni < 0 or ni >= len(scale):                          # odraz na kraji pásma
-                ni = ci - move
-            ci = max(0, min(len(scale) - 1, ni))
+            if not (0 <= ni < len(scale)):       # u kraje -> jen krok
+                ni = ci + direction
+            if not (0 <= ni < len(scale)):       # úplně na kraji -> jediný obrat (ne vzor)
+                ni = ci - direction
+            ni = max(0, min(len(scale) - 1, ni))
+            if scale[ni] == notes[-1]:           # neopakovat
+                ni = max(0, min(len(scale) - 1, ni + direction))
+            ci = ni
             notes.append(scale[ci])
         for k, p in enumerate(notes):
             line.append((i * bpc + k * (bpc / npb), (bpc / npb) * 0.92, p))
