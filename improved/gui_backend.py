@@ -24,8 +24,42 @@ OPTIONS = {
     "rhythms":  ["trioly (3)", "osminy (2)"],
     "partners": ["peterson", "lines"],   # učený partner do prolnutí (Evans x ?)
     "counts":   ["vše", "2", "4", "6"],  # kolik akordů (taktů) z progrese
+    "roots":    ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"],
+    "start_qualities": ["m7", "maj7", "7", "m7b5"],
 }
 DEFAULT_CHORDS = "Am7 D7 Gm7 Cm7 F7 Bbmaj7 Em7b5 A7"
+
+# Vzory progresí v římských číslicích, jako (posun v půltónech od základního tónu,
+# kvalita). "S" = použij uživatelem zvolenou kvalitu výchozího (base) akordu.
+PROG_PATTERNS = {
+    "I (jen tónika)":              [(0, "S")],
+    "ii–V (dur)":                  [(0, "S"), (5, "7")],
+    "ii–V–I (dur)":                [(0, "S"), (5, "7"), (10, "maj7")],
+    "ii–V–I–vi (turnaround dur)":  [(0, "S"), (5, "7"), (10, "maj7"), (7, "m7")],
+    "I–vi–ii–V (dur)":             [(0, "S"), (9, "m7"), (2, "m7"), (7, "7")],
+    "I–VI–II–V (sekund. dom.)":    [(0, "S"), (9, "7"), (2, "7"), (7, "7")],
+    "I–IV–iii–VI–ii–V (dur)":      [(0, "S"), (5, "maj7"), (4, "m7"), (9, "7"), (2, "m7"), (7, "7")],
+    "I–vi–ii–V–iii–VI–ii–V (rhythm)": [(0, "S"), (9, "m7"), (2, "m7"), (7, "7"),
+                                       (4, "m7"), (9, "7"), (2, "m7"), (7, "7")],
+    "ii°–V–i (moll)":              [(0, "S"), (5, "7"), (10, "m7")],
+    "i–iv–ii°–V (moll)":           [(0, "S"), (5, "m7"), (2, "m7b5"), (7, "7")],
+    "i–VI–ii°–V (moll)":           [(0, "S"), (8, "maj7"), (2, "m7b5"), (7, "7")],
+    "i–ii°–V–i (moll turnaround)": [(0, "S"), (2, "m7b5"), (7, "7"), (0, "m7")],
+}
+OPTIONS["patterns"] = list(PROG_PATTERNS)
+
+_QSUFFIX = {"m7": "m7", "maj7": "maj7", "7": "7", "m7b5": "m7b5"}
+
+
+def build_chords(root, quality, pattern):
+    """Sestaví symboly progrese z base akordu (root+quality) a vzoru (římsky)."""
+    roots = OPTIONS["roots"]
+    ri = roots.index(root) if root in roots else 0
+    out = []
+    for off, q in PROG_PATTERNS.get(pattern, [(0, "S")]):
+        qq = quality if q == "S" else q
+        out.append(roots[(ri + off) % 12] + _QSUFFIX.get(qq, qq))
+    return " ".join(out)
 
 # výchozí parametry buněk (pravidlové i markov)
 _CELL_CFG = {

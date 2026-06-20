@@ -49,6 +49,21 @@ class App:
         ttk.Entry(frm, textvariable=self.chords, width=52).grid(
             row=r, column=1, columnspan=3, sticky="we", **pad); r += 1
 
+        # stavba progrese: base akord (tón + kvalita) + vzor (římsky) -> Sestav
+        ttk.Label(frm, text="Sestav z akordu:").grid(row=r, column=0, sticky="w", **pad)
+        self.root_note = tk.StringVar(value="D")
+        self.start_q = tk.StringVar(value="m7")
+        bld = ttk.Frame(frm); bld.grid(row=r, column=1, columnspan=3, sticky="we", **pad)
+        ttk.OptionMenu(bld, self.root_note, self.root_note.get(),
+                       *be.OPTIONS["roots"]).pack(side="left")
+        ttk.OptionMenu(bld, self.start_q, self.start_q.get(),
+                       *be.OPTIONS["start_qualities"]).pack(side="left", padx=(4, 8))
+        self.pattern = tk.StringVar(value="ii–V–I (dur)")
+        ttk.OptionMenu(bld, self.pattern, self.pattern.get(),
+                       *be.OPTIONS["patterns"]).pack(side="left")
+        ttk.Button(bld, text="Sestav ▸", command=self.on_build_prog).pack(side="left", padx=8)
+        r += 1
+
         # váhy typů buněk (slidery 0..1)
         ttk.Label(frm, text="Váhy patternů:").grid(row=r, column=0, sticky="w", **pad); r += 1
         self.cellvars = {}
@@ -131,6 +146,11 @@ class App:
         }
 
     # ---- akce ----
+    def on_build_prog(self):
+        s = be.build_chords(self.root_note.get(), self.start_q.get(), self.pattern.get())
+        self.chords.set(s)
+        self.status.set(f"Sestaveno: {s}")
+
     def on_refresh_ports(self):
         ports = be.list_ports() or [""]
         menu = self.port_menu["menu"]; menu.delete(0, "end")
