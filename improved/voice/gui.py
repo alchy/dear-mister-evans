@@ -1,0 +1,140 @@
+"""gui -- slim GUI nad čistým generátorem (voice).
+
+Minimální první verze: výběr MIDI portu (kvůli zvuku!), akordy, hustota/bpm/seed,
+Generuj & přehraj / Stop. Náhled a ~5 os dle SPECu přibudou. Hraje balík voice
+(harmony + render + zatím triviální generate; fáze ③ vymění generátor za model).
+
+Spuštění:  python improved/voice/gui.py
+"""
+import os, sys, threading, tempfile, traceback
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))   # improved/ na path
+import tkinter as tk
+from tkinter import ttk
+import mido
+
+from voice.harmony import Harmony
+from voice.generate import trivial_line
+from voice.render import to_midi
+
+
+def default_port(names):
+    for want in ("loopmidi port 1", "wavetable"):
+        for n in names:
+            if want in n.lower():
+                return n
+    return names[0] if names else ""
+
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        root.title("voice — čistý generátor")
+        root.resizable(False, False)
+        self.stop = threading.Event()
+        self.worker = None
+        self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
+        self._build()
+
+    def _build(self):
+        f = ttk.Frame(self.root, padding=10)
+        f.grid(sticky="nsew")
+        pad = {"padx": 5, "pady": 4}
+        r = 0
+        names = mido.get_output_names() or [""]
+        ttk.Label(f, text="MIDI port:").grid(row=r, column=0, sticky="w", **pad)
+        self.port = tk.StringVar(value=default_port(names))
+        self.port_menu = ttk.OptionMenu(f, self.port, self.port.get(), *names)
+        self.port_menu.grid(row=r, column=1, columnspan=2, sticky="we", **pad)
+        ttk.Button(f, text="⟳", width=3, command=self.refresh_ports).grid(row=r, column=3, **pad)
+        r += 1
+
+        ttk.Label(f, text="Akordy:").grid(row=r, column=0, sticky="w", **pad)
+        self.chords = tk.StringVar(value="Dm7 G7 Cmaj7 Cmaj7")
+        ttk.Entry(f, textvariable=self.chords, width=40).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
+        r += 1
+
+        ttk.Label(f, text="Hustota (not/dobu):").grid(row=r, column=0, sticky="w", **pad)
+        self.density = tk.IntVar(value=2)
+        ttk.Spinbox(f, from_=1, to=4, textvariable=self.density, width=5).grid(row=r, column=1, sticky="w", **pad)
+        ttk.Label(f, text="BPM:").grid(row=r, column=2, sticky="e", **pad)
+        self.bpm = tk.IntVar(value=110)
+        ttk.Spinbox(f, from_=40, to=240, textvariable=self.bpm, width=6).grid(row=r, column=3, sticky="w", **pad)
+        r += 1
+
+        ttk.Label(f, text="Seed:").grid(row=r, column=0, sticky="w", **pad)
+        self.seed = tk.IntVar(value=1)
+        ttk.Spinbox(f, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=r, column=1, sticky="w", **pad)
+        r += 1
+
+        btns = ttk.Frame(f)
+        btns.grid(row=r, column=0, columnspan=4, sticky="we", pady=8)
+        ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=3)
+        ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=3)
+        ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3)
+        r += 1
+
+        self.status = tk.StringVar(value="Připraveno. (zatím triviální linka — hlas přijde ve fázi ③)")
+        ttk.Label(f, textvariable=self.status, foreground="#246", width=52, anchor="w").grid(
+            row=r, column=0, columnspan=4, sticky="w", **pad)
+
+    def refresh_ports(self):
+        names = mido.get_output_names() or [""]
+        menu = self.port_menu["menu"]
+        menu.delete(0, "end")
+        for n in names:
+            menu.add_command(label=n, command=lambda v=n: self.port.set(v))
+        if self.port.get() not in names:
+            self.port.set(default_port(names))
+        self.status.set(f"Porty obnoveny ({len(names)}).")
+
+    def on_reseed(self):
+        self.seed.set((self.seed.get() + 1) % 10000)
+        self.status.set(f"Seed = {self.seed.get()}")
+
+    def on_stop(self):
+        self.stop.set()
+        self.status.set("Stop.")
+
+    def on_play(self):
+        if self.worker and self.worker.is_alive():
+            self.status.set("Už hraji — nejdřív Stop.")
+            return
+        self.stop.clear()
+        self.worker = threading.Thread(target=self._gen_play, daemon=True)
+        self.worker.start()
+
+    def _gen_play(self):
+        try:
+            H = Harmony(self.chords.get())
+            line = trivial_line(H, density=self.density.get(), seed=self.seed.get())
+            to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
+            self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
+            self._play_file(self.preview)
+            if not self.stop.is_set():
+                self.status.set("Hotovo.")
+        except Exception as e:
+            traceback.print_exc()
+            self.status.set(f"Chyba: {e}")
+
+    def _play_file(self, path):
+        name = self.port.get()
+        if not name:
+            raise RuntimeError("Není vybraný MIDI port.")
+        with mido.open_output(name) as out:
+            for msg in mido.MidiFile(path).play():
+                if self.stop.is_set():
+                    break
+                out.send(msg)
+            for ch in range(16):
+                out.send(mido.Message("control_change", channel=ch, control=123, value=0))
+
+
+def main():
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
