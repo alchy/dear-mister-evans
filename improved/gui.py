@@ -35,6 +35,15 @@ class App:
         frm.grid(sticky="nsew")
         r = 0
 
+        # MIDI rozhraní (výstup) -- nahoře
+        ttk.Label(frm, text="MIDI rozhraní:").grid(row=r, column=0, sticky="w", **pad)
+        self.port = tk.StringVar(value=be.default_port())
+        ports = be.list_ports() or [""]
+        self.port_menu = ttk.OptionMenu(frm, self.port, self.port.get(), *ports)
+        self.port_menu.grid(row=r, column=1, columnspan=2, sticky="we", **pad)
+        ttk.Button(frm, text="⟳", width=3, command=self.on_refresh_ports).grid(
+            row=r, column=3, sticky="w", **pad); r += 1
+
         ttk.Label(frm, text="Akordy (progrese):").grid(row=r, column=0, sticky="w", **pad)
         self.chords = tk.StringVar(value=be.DEFAULT_CHORDS)
         ttk.Entry(frm, textvariable=self.chords, width=52).grid(
@@ -89,13 +98,6 @@ class App:
         ttk.Spinbox(frm, from_=0, to=9999, textvariable=self.seed, width=6).grid(
             row=r, column=3, sticky="w", **pad); r += 1
 
-        # port
-        _drop(frm, r, "MIDI výstup:", None, [], pad)
-        self.port = tk.StringVar(value=be.default_port())
-        ports = be.list_ports() or [""]
-        ttk.OptionMenu(frm, self.port, self.port.get(), *ports).grid(
-            row=r, column=1, columnspan=3, sticky="we", **pad); r += 1
-
         # tlačítka
         btns = ttk.Frame(frm); btns.grid(row=r, column=0, columnspan=4, sticky="we", pady=8)
         ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=4)
@@ -124,6 +126,15 @@ class App:
         }
 
     # ---- akce ----
+    def on_refresh_ports(self):
+        ports = be.list_ports() or [""]
+        menu = self.port_menu["menu"]; menu.delete(0, "end")
+        for p in ports:
+            menu.add_command(label=p, command=lambda v=p: self.port.set(v))
+        if self.port.get() not in ports:
+            self.port.set(be.default_port() or (ports[0] if ports else ""))
+        self.status.set(f"Porty obnoveny ({len(ports)}).")
+
     def on_reseed(self):
         self.seed.set((self.seed.get() + 1) % 10000)
         self.status.set(f"Seed = {self.seed.get()}")
