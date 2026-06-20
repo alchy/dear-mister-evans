@@ -18,7 +18,7 @@ from harmony import PC
 
 JAZZ = r"C:\Users\jindr\OneDrive\Jazz Learning"
 JJ = os.path.join(JAZZ, "LESSON - Bill Evans (Jazz Jane)")
-TARGET = os.path.join(JAZZ, "LESSON - Simplified Evans")
+TARGET = os.path.join(JAZZ, "LESSON - Simplified Evans v2")   # nová pipeline (naučená melodie + rytmický comp)
 
 # (název výstupu, zdrojové MIDI, bpm, takty)
 JOBS = [
@@ -50,7 +50,7 @@ def resolve(src):
 
 def main():
     os.makedirs(TARGET, exist_ok=True)
-    index = ["# SIMPLIFIED EVANS -- učební sada", ""]
+    index = ["# SIMPLIFIED EVANS v2 -- učební sada (naučená Evansova melodie + rytmický comp)", ""]
     ok = 0
     for label, src, bpm, bars in JOBS:
         path = resolve(src)
