@@ -125,8 +125,9 @@ def build_recipe(params):
 # ======================= FEEDBACK: párové ladění (B lepší než A) =======================
 # Dvě úrovně podle preference uživatele (klik na regeneraci -> "tahle je lepší"):
 #  A) MIKRO: preferenční model intervalů PODMÍNĚNÝ kontextem (poziční třída v taktu +
-#     registrové pásmo), párově B counts++ / A counts-- (podlaha 0), přimíchaný do
-#     báze (Evans/prolnutí) přes FeedbackOverlay. Base zůstává zmrazený.
+#     registrové pásmo), párově B counts++ / A counts-- (podlaha 0). VOLNÝ DRIFT:
+#     v kontextech, kde feedback má data, PŘEBÍRÁ řízení (deterministicky); kde nemá,
+#     padá na bázi (Evans/prolnutí). Tj. model "se stává tebou", jak feedback přibývá.
 #  D) MAKRO: bandit nad vahami typů buněk (recipe "cells") -> _CELL_BIAS násobí váhy.
 # Zdroj pravdy = jazz_feedback.json (události + legacy "liked"); model se z něj REPLAYuje
 # při startu, takže ladění přežije restart. Každá událost jde i na stdout ([FEEDBACK]).
@@ -189,9 +190,12 @@ class CondPref:
                 _bump(self.starts, iv, amount)
 
     def sample(self, cond, temperature=1.0, rng=None):
+        """VOLNÝ DRIFT: vrať interval jen z KONKRÉTNÍHO kontextu (pozice/pásmo),
+        NE z globálu -> nenaučené kontexty zůstanou Evansovi (báze). Kde feedback
+        data má, převezme řízení; kde nemá, vrátí None."""
         rng = rng or random
         pos, band = cond
-        for k in self._keys(pos, band):
+        for k in self._keys(pos, band)[:-1]:       # [:-1] = bez globálu ()
             d = self.tab.get(k)
             if d and sum(d.values()) >= 1.0:
                 return _draw_iv(d, temperature, rng)
@@ -207,9 +211,9 @@ class FeedbackOverlay:
         self.order = getattr(base, "order", 2)
 
     def sample(self, ctx, temperature=1.0, rng=None, cond=None):
-        if rng is not None and self.w > 0 and cond is not None and rng.random() < self.w:
-            try:
-                iv = self.fb.sample(cond, temperature, rng)
+        if cond is not None:                       # VOLNÝ DRIFT: feedback PŘEBÍRÁ kontexty,
+            try:                                   # kde má data; jinak padne na bázi (Evans)
+                iv = self.fb.sample(cond, temperature, rng or random)
                 if iv is not None:
                     return (iv, 0.5)               # interval -> token (rytmus řeší cell)
             except Exception:
@@ -299,7 +303,8 @@ def _log_event(ev):
     if ev.get("worse"):
         parts.append(f"HORŠÍ cell={ev.get('wcell')} {desc(ev['worse'])}")
     bias = {k: round(v, 2) for k, v in _CELL_BIAS.items() if abs(v - 1.0) > 1e-6}
-    parts.append(f"cell_bias={bias} w={_overlay_w():.2f} preferencí={feedback_count()} událostí={_N_EVENTS}")
+    cov = sum(1 for k in _fb_model().tab if k != ())     # naučených (převzatých) kontextů
+    parts.append(f"cell_bias={bias} kontextů={cov} preferencí={feedback_count()} událostí={_N_EVENTS}")
     msg = " | ".join(parts)
     try:                                                  # konzole nemusí umět češtinu (cp1252)
         print(msg, flush=True)
