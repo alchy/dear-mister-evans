@@ -56,6 +56,34 @@ def cell_scale(sc, ci, direction, npb, cell, rng):
     return notes
 
 
+def cell_run(sc, ci, npb, cell, rng):
+    """Bebopový triolový BĚH ve stylu Peterson Ex.4 (komplexní 2. část):
+    převážně krok, chromatické OBKLÍČENÍ cíle zespoda na začátku doby, občasná
+    tercie (arpeggio vsuvka) a změna směru, odraz od krajů rejstříku."""
+    enclose = cell.get("enclose", True)      # chromatické obklíčení cíle
+    enc_p = cell.get("enc_p", 0.5)           # jak často (ne na každé době)
+    skip = cell.get("skip", 0.22)            # pravděpodobnost tercie (arpeggio)
+    rev = cell.get("rev", 0.18)              # pravděpodobnost změny směru
+    beat = cell.get("beat", 3)               # trioly = 3/dobu
+    hi_i = len(sc) - 1; d = 1; notes = []
+    for n in range(npb):
+        if enclose and n > 0 and n % beat == 0 and rng.random() < enc_p:
+            notes.append(sc[ci] - 1)         # půltón zespoda -> rozvod na cíl
+            continue
+        notes.append(sc[ci])
+        if rng.random() < rev:
+            d = -d
+        step = (2 if rng.random() < skip else 1) * d
+        ni = ci + step
+        if ni < 1 or ni > hi_i - 1:          # odraz od krajů -> drž rejstřík
+            d = -d; ni = ci - step
+        ni = max(0, min(hi_i, ni))
+        if sc[ni] == sc[ci]:                 # nikdy neopakuj stejný tón
+            ni = max(0, min(hi_i, ci + d))
+        ci = ni
+    return notes
+
+
 def cell_arpeggio(sc, base, npb, group, cell, rng):
     """Sestupné arpeggio v terciích po 'group' notách; začátky buněk stoupají;
     volitelný chromatický náběh na první buňce ('triplets in four')."""
@@ -129,6 +157,23 @@ def markov_line(spec, progression, model, rng):
     return line
 
 
+def no_repeats(line):
+    """Pojistka enginu: žádná nota se nikdy neopakuje 2× po sobě (i přes hranice
+    taktů). Opakovaný tón posune o krok (přednostně celý tón ve směru pohybu)."""
+    out = []
+    for k, (t, d, p) in enumerate(line):
+        if out and p == out[-1][2]:
+            prev = out[-1][2]
+            nxt = line[k + 1][2] if k + 1 < len(line) else None
+            dr = 1 if (len(out) >= 2 and out[-1][2] >= out[-2][2]) else -1
+            for shift in (dr * 2, -dr * 2, dr, -dr, 2, -2, 1, -1):
+                cand = prev + shift
+                if cand != prev and cand != nxt:
+                    p = cand; break
+        out.append((t, d, p))
+    return out
+
+
 def generate(spec, progression, model=None, seed=None):
     rng = random.Random(seed)
     rh = spec["rhythm"]; sub = rh["sub"]; group = rh.get("group", 4)
@@ -136,7 +181,7 @@ def generate(spec, progression, model=None, seed=None):
     kind = spec.get("scale", "auto"); cell = spec["cell"]; ctype = cell["type"]
     dirmode = cell.get("dir", "alt")
     if ctype == "markov":
-        return markov_line(spec, progression, model, rng)
+        return no_repeats(markov_line(spec, progression, model, rng))
     line = []; prev_last = lo + 6
     for i, (r, q) in enumerate(progression):
         sc = scale_for(r, q, lo - 1, hi + 1, kind)
@@ -144,7 +189,7 @@ def generate(spec, progression, model=None, seed=None):
             continue
         idx = lambda p: min(range(len(sc)), key=lambda k: abs(sc[k] - p))
         direction = (1 if i % 2 == 0 else -1) if dirmode == "alt" else (1 if dirmode == "up" else -1)
-        start_dir = 1 if ctype == "arpeggio" else direction   # arpeggio staví zdola nahoru
+        start_dir = 1 if ctype in ("arpeggio", "run") else direction  # běh/arpeggio zdola
         if spec.get("target", "guide_tone") == "guide_tone":
             start = guide_start(r, q, sc, lo, hi, start_dir, prev_last)
         else:
@@ -152,6 +197,8 @@ def generate(spec, progression, model=None, seed=None):
         si = idx(start)
         if ctype == "arpeggio":
             pitches = cell_arpeggio(sc, si, npb, group, cell, rng)
+        elif ctype == "run":
+            pitches = cell_run(sc, si, npb, cell, rng)
         elif ctype == "markov":
             pitches = cell_markov(sc, si, direction, npb, cell, rng, model)
         else:
@@ -159,7 +206,7 @@ def generate(spec, progression, model=None, seed=None):
         for n, p in enumerate(pitches[:npb]):
             line.append((i * bpc + n / sub, (1.0 / sub) * 0.9, p))
         prev_last = pitches[-1] if pitches else prev_last
-    return line
+    return no_repeats(line)
 
 
 def make(spec, progression, out, bpm=112, model=None, seed=1):
@@ -191,6 +238,17 @@ SPECS = {
         "rhythm": {"sub": 2, "group": 4, "swing": 0.11},
         "cell": {"type": "markov", "temp": 1.0},
         "scale": "auto", "target": "guide_tone", "range": [60, 86],
+    },
+    # Oscar Peterson "Jazz Exercises" Ex.4: vzestupný triolový bebopový běh.
+    "oscar_run": {   # 1. část: holý vzor (stupnicový běh nahoru, bebopová chromatika)
+        "rhythm": {"sub": 3, "group": 4, "swing": 0},
+        "cell": {"type": "run", "enclose": False, "skip": 0.18, "rev": 0.0},
+        "scale": "bebop", "target": "guide_tone", "range": [55, 90],
+    },
+    "oscar_dev": {   # 2. část: rozehrané -> obklíčení + směr + arpeggio vsuvky
+        "rhythm": {"sub": 3, "group": 4, "swing": 0},
+        "cell": {"type": "run", "enclose": True, "enc_p": 0.5, "skip": 0.24, "rev": 0.20},
+        "scale": "auto", "target": "guide_tone", "range": [55, 90],
     },
 }
 
