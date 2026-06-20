@@ -48,9 +48,11 @@ def resolve(src):
         return src[0] if src else None
     return src if os.path.exists(src) else None
 
-def main():
-    os.makedirs(TARGET, exist_ok=True)
-    index = ["# SIMPLIFIED EVANS v2 -- učební sada (naučená Evansova melodie + rytmický comp)", ""]
+def main(comp="rhythm"):
+    target = TARGET if comp == "rhythm" else TARGET + " (bass chord)"
+    os.makedirs(target, exist_ok=True)
+    style = "rytmický comp" if comp == "rhythm" else "bas+akord na takt (bez compingu)"
+    index = [f"# SIMPLIFIED EVANS v2 -- učební sada (naučená Evansova melodie, {style})", ""]
     ok = 0
     for label, src, bpm, bars in JOBS:
         path = resolve(src)
@@ -59,7 +61,7 @@ def main():
         print(f"\n== {label} ==")
         try:
             r = arrange(path, bars=bars, bpm=bpm, melody=True,
-                        out_dir=TARGET, seed=1, name=label)
+                        out_dir=target, seed=1, name=label, comp=comp)
             prog = " | ".join(f"{PC[a]}{q}" for a, q in r["prog"])
             index += [f"## {label}   [tónina: {r['key']}, {bpm} bpm]",
                       f"   zdroj : {os.path.basename(path)}",
@@ -67,9 +69,12 @@ def main():
             ok += 1
         except Exception as e:
             print(f"!! chyba u {label}: {e}"); traceback.print_exc()
-    with open(os.path.join(TARGET, "index.txt"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(target, "index.txt"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(index))
-    print(f"\nHotovo: {ok}/{len(JOBS)} -> {TARGET}")
+    print(f"\nHotovo: {ok}/{len(JOBS)} -> {target}")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--comp", default="rhythm", choices=["rhythm", "sustain"])
+    main(ap.parse_args().comp)

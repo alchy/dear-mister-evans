@@ -89,7 +89,8 @@ def auto_form(progression, block=4):
     return labels
 
 
-def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1, name=None):
+def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1, name=None,
+            comp="rhythm"):
     name = name or os.path.splitext(os.path.basename(path))[0][:40]
     notes = load_notes(path)
     prog, key = detect_progression(notes, bar=4.0, max_bars=bars)
@@ -107,7 +108,7 @@ def arrange(path, bars=None, bpm=110, melody=True, out_dir=None, seed=1, name=No
         import melody_markov
         line = melody_markov.finalize_melody(prog, voic, seed=seed)
         om = os.path.join(out_dir, f"{name}__full.mid")
-        render_full(prog, voic, line, om, bpm=bpm); outs.append(om)
+        render_full(prog, voic, line, om, bpm=bpm, comp=comp); outs.append(om)
     for o in outs:
         print(f"  -> {o}")
     return {"outs": outs, "key": key, "prog": prog, "form": form}
