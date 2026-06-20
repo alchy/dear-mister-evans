@@ -14,8 +14,8 @@ from tkinter import ttk
 import mido
 
 from voice.harmony import Harmony
-from voice.generate import trivial_line
 from voice.render import to_midi
+from voice import melody
 
 
 def default_port(names):
@@ -34,6 +34,7 @@ class App:
         self.stop = threading.Event()
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
+        self.model = melody.get_model()          # Evansův prior (cache); None -> fallback
         self._build()
 
     def _build(self):
@@ -65,6 +66,10 @@ class App:
         ttk.Label(f, text="Seed:").grid(row=r, column=0, sticky="w", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(f, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=r, column=1, sticky="w", **pad)
+        ttk.Label(f, text="Dobrodružnost:").grid(row=r, column=2, sticky="e", **pad)
+        self.temp = tk.DoubleVar(value=1.0)
+        ttk.Spinbox(f, from_=0.6, to=1.8, increment=0.1, textvariable=self.temp, width=6).grid(
+            row=r, column=3, sticky="w", **pad)
         r += 1
 
         btns = ttk.Frame(f)
@@ -74,7 +79,8 @@ class App:
         ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3)
         r += 1
 
-        self.status = tk.StringVar(value="Připraveno. (zatím triviální linka — hlas přijde ve fázi ③)")
+        msg = "Připraveno." if self.model else "Připraveno. (prior nenačten — fallback krokový pohyb)"
+        self.status = tk.StringVar(value=msg)
         ttk.Label(f, textvariable=self.status, foreground="#246", width=52, anchor="w").grid(
             row=r, column=0, columnspan=4, sticky="w", **pad)
 
@@ -107,7 +113,8 @@ class App:
     def _gen_play(self):
         try:
             H = Harmony(self.chords.get())
-            line = trivial_line(H, density=self.density.get(), seed=self.seed.get())
+            line = melody.generate(H, self.model, density=self.density.get(),
+                                   seed=self.seed.get(), temperature=self.temp.get())
             to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
             self._play_file(self.preview)
