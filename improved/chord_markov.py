@@ -98,8 +98,18 @@ class ChordMarkov:
         return self._draw(self.starts, temperature, rng) if self.starts else (0, 'maj7')
 
 
-def train(data_glob, order=2, verbose=True):
-    seqs = build_corpus(data_glob)
+def load_corpus(source="both", data_glob=DEFAULT_DATA):
+    """source: 'midi' (detekce z MIDI), 'curated' (čistý korpus standardů), 'both'."""
+    seqs = []
+    if source in ("curated", "both"):
+        import standards
+        seqs += standards.to_corpus()
+    if source in ("midi", "both"):
+        seqs += build_corpus(data_glob)
+    return seqs
+
+
+def train_models(seqs, order=2, verbose=True):
     models = {'maj': ChordMarkov(order), 'min': ChordMarkov(order)}
     counts = {'maj': 0, 'min': 0}
     for mode, toks in seqs:
@@ -107,6 +117,10 @@ def train(data_glob, order=2, verbose=True):
     if verbose:
         print(f"natrénováno: {len(seqs)} skladeb (dur {counts['maj']}, moll {counts['min']})")
     return models
+
+
+def train(data_glob, order=2, verbose=True):
+    return train_models(build_corpus(data_glob), order, verbose)
 
 
 def generate(model, mode, bars=16, temperature=1.0, seed=None):
@@ -152,11 +166,12 @@ if __name__ == "__main__":
     ap.add_argument("--temp", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--data", default=DEFAULT_DATA)
+    ap.add_argument("--source", default="curated", choices=["midi", "curated", "both"])
     ap.add_argument("--render", default=None, help="ulož aranž do MIDI")
     ap.add_argument("--bpm", type=int, default=110)
     a = ap.parse_args()
 
-    models = train(a.data)
+    models = train_models(load_corpus(a.source, a.data))
     key_root = PC.index(a.key) if a.key in PC else 0
     seq = generate(models[a.mode], a.mode, bars=a.bars, temperature=a.temp, seed=a.seed)
     prog = to_prog(seq, key_root)
