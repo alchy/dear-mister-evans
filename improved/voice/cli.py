@@ -43,7 +43,7 @@ def main():
 def _default_port():
     import mido
     names = mido.get_output_names()
-    for want in ("loopmidi port 1", "wavetable"):
+    for want in ("wavetable", "loopmidi port 1"):     # Wavetable první = jistota zvuku
         for n in names:
             if want in n.lower():
                 return n

@@ -19,7 +19,8 @@ from voice import melody
 
 
 def default_port(names):
-    for want in ("loopmidi port 1", "wavetable"):
+    # GS Wavetable první = "vždy slyšet" jistota; loopMIDI/Vienna v rozbalovátku.
+    for want in ("wavetable", "loopmidi port 1"):
         for n in names:
             if want in n.lower():
                 return n
