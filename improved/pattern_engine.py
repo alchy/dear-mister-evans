@@ -253,29 +253,63 @@ def _wchoice(weights, rng):
     return items[-1][0]
 
 
-def synth_generate(recipe, progression, model=None, seed=None):
-    """Skládá cvičení PO TAKTECH: typ buňky (scale/arpeggio/run = pravidla,
-    markov = naučené/prolnuté) se losuje dle 'cells' vah. Sdílí rytmus, stupnici
-    a landing. 'markov' buňka používá předaný (i prolnutý) model."""
-    rng = random.Random(seed)
+def _bar_rng(seed, i, bv):
+    """Vlastní RNG pro každý takt -> variaci jednoho taktu (bv) lze přehodit
+    lokálně, ostatní takty se nezmění."""
+    return random.Random((int(seed) * 1000003 + i * 9176 + int(bv) * 99991) & 0x7fffffff)
+
+
+def flow_start(r, q, sc, lo, hi, prev_last):
+    """Vstup taktu pro PLYNULOU návaznost: guide tón akordu nejblíž konci
+    předchozího taktu (BEZ registrové zóny) -> hladké voice-leading švy a zároveň
+    propagace (změna konce předchozího taktu posune i start tohoto)."""
+    gts = sd.guide_pitches(r, q, lo, hi) or sc
+    return min(gts, key=lambda g: abs(g - prev_last))
+
+
+def land_into(progression, i, pitches, lo, hi):
+    """Poziční landing: poslední tón taktu i nahradí CHROMATICKÝM příchodem ke
+    guide tónu DALŠÍHO akordu nejblíž aktuální poloze -> rozvede se na 1. dobu
+    dalšího taktu (jehož start se odvíjí od konce tohoto = dopředná návaznost)."""
+    if len(pitches) < 2 or i + 1 >= len(progression):
+        return pitches
+    r2, q2 = progression[i + 1]
+    gts = sd.guide_pitches(r2, q2, lo, hi)
+    if not gts:
+        return pitches
+    tgt = min(gts, key=lambda g: abs(g - pitches[-2]))    # guide tón dalšího akordu blízko nás
+    appr = tgt - 1 if pitches[-2] <= tgt else tgt + 1     # příchod zdola/shora
+    out = list(pitches)
+    if appr != out[-2]:                                   # neopakuj předchozí tón
+        out[-1] = appr
+    return out
+
+
+def synth_generate(recipe, progression, model=None, seed=None, bar_var=None):
+    """Skládá cvičení PO TAKTECH (každý takt vlastní RNG -> lokální variace).
+    Typ buňky (scale/arpeggio/run = pravidla, markov = naučené/prolnuté) se losuje
+    dle 'cells' vah; 'markov' buňka používá předaný (i prolnutý) model.
+    bar_var = seznam variant po taktech (změna jednoho prvku přehodí jen ten takt)."""
     rh = recipe["rhythm"]; sub = rh["sub"]; group = rh.get("group", 4)
     lo, hi = recipe.get("range", [55, 88]); bpc = 4.0; npb = sub * 4
     kind = recipe.get("scale", "auto"); cells = recipe["cells"]
     cfg = recipe.get("cell_cfg", {})
-    line = []; prev_last = lo + 6; used = []
+    landing = recipe.get("target", "guide_tone") == "guide_tone"
+    line = []; used = [None] * len(progression); prev_last = (lo + hi) // 2
     for i, (r, q) in enumerate(progression):
         sc = scale_for(r, q, lo - 1, hi + 1, kind)
         if not sc:
             continue
+        bv = bar_var[i] if (bar_var and i < len(bar_var)) else 0
+        rng = _bar_rng(seed, i, bv)                       # nezávislý RNG na takt (vnitřek)
         idx = lambda p: min(range(len(sc)), key=lambda k: abs(sc[k] - p))
-        ctype = _wchoice(cells, rng); used.append(ctype)
+        ctype = _wchoice(cells, rng); used[i] = ctype
         cell = dict(cfg.get(ctype, {})); cell["type"] = ctype
         direction = 1 if i % 2 == 0 else -1
         start_dir = 1 if ctype in ("arpeggio", "run") else direction
-        if recipe.get("target", "guide_tone") == "guide_tone":
-            start = guide_start(r, q, sc, lo, hi, start_dir, prev_last)
-        else:
-            start = sc[idx(prev_last)]
+        # DOPŘEDNÁ NÁVAZNOST: vstup taktu = guide tón blízko konce předchozího taktu
+        # (hladký šev) -> regenerace taktu se propíše do následujících (ne do předchozích).
+        start = flow_start(r, q, sc, lo, hi, prev_last) if landing else (lo + hi) // 2
         si = idx(start)
         if ctype == "arpeggio":
             pitches = cell_arpeggio(sc, si, npb, group, cell, rng)
@@ -285,15 +319,20 @@ def synth_generate(recipe, progression, model=None, seed=None):
             pitches = cell_markov(sc, si, direction, npb, cell, rng, model)
         else:
             pitches = cell_scale(sc, si, direction, npb, cell, rng)
-        for n, p in enumerate(pitches[:npb]):
-            line.append((i * bpc + n / sub, (1.0 / sub) * 0.9, p))
-        prev_last = pitches[-1] if pitches else prev_last
-    return no_repeats(limit_leaps(line)), used
+        pitches = pitches[:npb]
+        if landing:                                       # poziční landing do dalšího akordu
+            pitches = land_into(progression, i, pitches, lo, hi)
+        seg = no_repeats(limit_leaps([(i * bpc + n / sub, (1.0 / sub) * 0.9, p)
+                                      for n, p in enumerate(pitches)]))
+        line.extend(seg)
+        if seg:
+            prev_last = seg[-1][2]                         # konec taktu -> vstup dalšího (návaznost)
+    return line, used
 
 
-def synth_make(recipe, progression, out, bpm=110, model=None, seed=1):
+def synth_make(recipe, progression, out, bpm=110, model=None, seed=1, bar_var=None):
     """Syntéza cvičení z receptu (váhy typů + prolnutý model) -> MIDI."""
-    line, used = synth_generate(recipe, progression, model=model, seed=seed)
+    line, used = synth_generate(recipe, progression, model=model, seed=seed, bar_var=bar_var)
     _render(recipe["rhythm"], progression, line, out, bpm, recipe.get("voicing", "rootless"))
     return line, used
 

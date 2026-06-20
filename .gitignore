@@ -25,5 +25,6 @@ pianochord_shot.png
 .DS_Store
 Thumbs.db
 
-# GUI stav (lokální konfigurace)
+# GUI stav (lokální konfigurace) + feedback uživatele (preference k ladění)
 jazz_gui_state.json
+jazz_feedback.json

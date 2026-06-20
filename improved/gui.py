@@ -57,6 +57,9 @@ class App:
         self.state_path = os.path.join(os.getcwd(), STATE_FILE)
         self._loading = False
         self._job = None
+        self.bar_var = {}             # {index taktu: číslo varianty} -> lokální regenerace
+        self.prev_variant = {}        # {index taktu: {mel, cell}} -> párový feedback (A před B)
+        self._last_chords = None
         self._build()
         self._register_traces()
         self._load_state()            # obnov poslední konfiguraci ze souboru
@@ -155,7 +158,8 @@ class App:
         self.mel_x0 = self.bass_btn + BTNW + COL_GAP
         self.mel_w = whites(MEL_LO, MEL_HI + 1) * WW
         self.mel_btn = self.mel_x0 + self.mel_w + BTN_GAP     # tlačítko výpisu (melodie)
-        total_w = self.mel_btn + BTNW + 6
+        self.mel_regen = self.mel_btn + BTNW + BTN_GAP        # tlačítko REGENERACE taktu
+        total_w = self.mel_regen + BTNW + 6
         nrows = max(4, len(be.DEFAULT_CHORDS.split()))
         self.kbd = tk.Canvas(frm, width=total_w + 6, height=min(8, nrows) * ROW_H + 10,
                              bg="#fafafa", highlightthickness=0)
@@ -164,10 +168,11 @@ class App:
         self.kbd.grid(row=0, column=0, sticky="n")
         sb.grid(row=0, column=1, sticky="ns")
         self.kbd.configure(cursor="hand2")
-        self.kbd.bind("<Button-1>", self.on_kbd_click)     # klik = přehraj blok
+        self.kbd.bind("<Button-1>", self.on_kbd_click)     # levý klik = přehraj / regeneruj
+        self.kbd.bind("<Button-3>", self.on_kbd_rclick)    # pravý klik = "tahle je lepší" (feedback)
         ttk.Label(frm, foreground="#666",
                   text="● levá ruka (bas/akord)   ● melodie   čísla = pořadí stisku   — přesun hlasu"
-                  "\n(klikni na klaviaturu: vlevo zahraje akord, vpravo melodickou linku)"
+                  "\n(klaviatura: vlevo akord · vpravo linka · ↻ = regeneruj takt · pravý klik na ↻ = lepší → feedback)"
                   ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
     def _drop(self, frm, row, label, var, values, pad):
@@ -258,6 +263,15 @@ class App:
         cv.create_text(x + BTNW / 2, ky + WH / 2, text="≡", fill="#456",
                        font=("Segoe UI", 12, "bold"))
 
+    def _regenbtn(self, cv, x, ky, i):
+        """Úzké tlačítko REGENERACE melodického taktu (↻); pravý klik = lepší."""
+        on = self.bar_var.get(i, 0) > 0
+        cv.create_rectangle(x, ky, x + BTNW, ky + WH,
+                            fill=("#fde7c7" if on else "#eef5e7"),
+                            outline=("#d08a2a" if on else "#7fa86a"))
+        cv.create_text(x + BTNW / 2, ky + WH / 2, text="↻", fill="#5a3",
+                       font=("Segoe UI", 13, "bold"))
+
     def _cx(self, x0, lo, hi, m):
         m = max(lo, min(hi, m))
         if m % 12 in BLACK_PC:
@@ -291,6 +305,9 @@ class App:
         cv = getattr(self, "kbd", None)
         if cv is None:
             return
+        ch = self.chords.get()
+        if ch != self._last_chords:        # změna progrese -> indexy taktů se posunuly
+            self.bar_var.clear(); self.prev_variant.clear(); self._last_chords = ch
         cv.delete("all")
         try:
             rows = be.preview_sequences(self.params())
@@ -306,6 +323,7 @@ class App:
             self._keyboard(cv, self.mel_x0, ky, MEL_LO, MEL_HI)
             self._logbtn(cv, self.bass_btn, ky)              # tlačítka výpisu do stdout
             self._logbtn(cv, self.mel_btn, ky)
+            self._regenbtn(cv, self.mel_regen, ky, i)        # regenerace melodického taktu
         # čáry přesunu hlasů (bas/akord) mezi sousedními řádky
         for i in range(len(rows) - 1):
             yb = 8 + i * ROW_H + LBL + WH
@@ -321,11 +339,12 @@ class App:
             ky = 8 + i * ROW_H + LBL
             self._seq(cv, 0, ky, BASS_LO, BASS_HI, [row["bass"]] + row["voicing"], DOT_BASS)
             self._seq(cv, self.mel_x0, ky, MEL_LO, MEL_HI, row["mel"], DOT_MEL)
-        total_w = self.mel_x0 + whites(MEL_LO, MEL_HI + 1) * WW
+        total_w = self.mel_regen + BTNW
         cv.config(scrollregion=(0, 0, total_w + 6, 8 + len(rows) * ROW_H + 6))
 
     # ---------- params ----------
     def params(self):
+        n = len(self.chords.get().split())
         return {
             "chords": self.chords.get(), "port": self.port.get(),
             "cells": {c: v.get() for c, v in self.cellvars.items()},
@@ -333,6 +352,7 @@ class App:
             "count": self.count.get(), "voicing": self.voicing.get(),
             "scale": self.scale.get(), "rhythm": self.rhythm.get(),
             "in_four": self.in_four.get(), "bpm": self.bpm.get(), "seed": self.seed.get(),
+            "bar_var": [self.bar_var.get(i, 0) for i in range(n)],   # lokální varianty taktů
         }
 
     # ---------- klik na klaviaturu = přehraj blok ----------
@@ -355,16 +375,20 @@ class App:
         if self.mel_btn <= x <= self.mel_btn + BTNW:
             print(be.describe_block("line", row["label"], row["mel"]), flush=True)
             self.status.set(f"Vypsáno (melodie {row['label']}) do stdout."); return
+        if self.mel_regen <= x <= self.mel_regen + BTNW:   # ↻ regeneruj jen tento melodický takt
+            self._regen_bar(i); return
         if x <= self.bass_w:
-            kind, notes, what = "chord", [row["bass"]] + row["voicing"], f"akord {row['label']}"
+            self._play_block("chord", [row["bass"]] + row["voicing"], f"akord {row['label']}", row=i)
         elif self.mel_x0 <= x <= self.mel_x0 + self.mel_w:
-            kind, notes, what = "line", row["mel"], f"linka {row['label']}"
-        else:
-            return
+            self._play_block("line", row["mel"], f"linka {row['label']}", row=i)
+
+    def _play_block(self, kind, notes, what, row=None):
+        """Přehraj jeden blok (akord/linka) v threadu; jeden přehrávač pro klik i regeneraci."""
         if self.worker and self.worker.is_alive():
             self.status.set("Už hraji — nejdřív Stop."); return
         self.stop_event.clear()
         sub = be._sub(self.params()); bpm = self.bpm.get(); port = self.port.get()
+        self._set_playing(row, kind)                       # decentní indikace přehrávané řádky
 
         def run():
             try:
@@ -374,7 +398,70 @@ class App:
                     self.status.set(f"Hotovo ({what}).")
             except Exception as e:
                 traceback.print_exc(); self.status.set(f"Chyba: {e}")
+            finally:
+                self.root.after(0, lambda: self._set_playing(None))
         self.worker = threading.Thread(target=run, daemon=True); self.worker.start()
+
+    def _set_playing(self, row, kind="line"):
+        """Jemná zelená linka nad přehrávanou řádkou kláves (indikace přehrávání;
+        decentní, neukrajuje z layoutu). row=None linku zhasne."""
+        cv = getattr(self, "kbd", None)
+        if cv is None:
+            return
+        cv.delete("playline")
+        if row is None or not (0 <= row < len(getattr(self, "last_rows", []))):
+            return
+        ky = 8 + row * ROW_H + LBL
+        x0, x1 = (0, self.bass_w) if kind == "chord" else (self.mel_x0, self.mel_x0 + self.mel_w)
+        cv.create_line(x0, ky - 3, x1, ky - 3, fill="#35c75a", width=2, tags="playline")
+
+    # ---------- regenerace taktu + párový feedback (ladění modelu) ----------
+    def _regen_bar(self, i):
+        """↻ : ulož stávající variantu (A) pro feedback, přehoď tento takt a NAVAZUJÍCÍ
+        -> pokračování vyplyne z nové fráze (hladký šev), předchozí takty zůstanou.
+        Překresli a přehraj tento takt. 'Lepší?' pošleš pravým klikem na ↻."""
+        rows = getattr(self, "last_rows", None)
+        if not rows or not (0 <= i < len(rows)):
+            return
+        self.prev_variant[i] = {"mel": list(rows[i]["mel"]), "cell": rows[i].get("cell")}
+        n = len(self.chords.get().split())
+        for j in range(i, n):                              # tento takt + navazující průběh
+            self.bar_var[j] = self.bar_var.get(j, 0) + 1
+        self.draw_progression()
+        new = self.last_rows[i] if i < len(self.last_rows) else {"mel": []}
+        self._play_block("line", new.get("mel", []), f"varianta taktu {i + 1}", row=i)
+        self.status.set(f"Takt {i + 1}: nová varianta + přetečené pokračování (var {self.bar_var[i]}). "
+                        f"Pravý klik na ↻ = pošli jako LEPŠÍ.")
+
+    def on_kbd_rclick(self, event):
+        """Pravý klik na ↻ (nebo melodickou linku) = aktuální takt je LEPŠÍ než
+        předchozí varianta -> párový feedback do modelu (B↑/A↓) + stdout."""
+        rows = getattr(self, "last_rows", None)
+        if not rows:
+            return
+        x = self.kbd.canvasx(event.x); y = self.kbd.canvasy(event.y)
+        i = int((y - 8) // ROW_H)
+        if not (0 <= i < len(rows)):
+            return
+        ky = 8 + i * ROW_H + LBL
+        if not (ky <= y <= ky + WH):
+            return
+        if not (self.mel_x0 <= x <= self.mel_regen + BTNW):   # jen melodická oblast + ↻
+            return
+        row = rows[i]; better = row.get("mel") or []
+        if len(better) < 2:
+            self.status.set("Prázdný takt — nelze poslat feedback."); return
+        prev = self.prev_variant.get(i)
+        worse = (prev or {}).get("mel")
+        sub = be._sub(self.params())
+        try:
+            n = be.prefer_variant(better, worse, sub,
+                                  better_cell=row.get("cell"),
+                                  worse_cell=(prev or {}).get("cell"))
+            kind = "lepší než předchozí" if worse else "👍 (bez srovnání)"
+            self.status.set(f"Feedback ✓ takt {i + 1} ({kind}). Preferencí: {n}")
+        except Exception as e:
+            traceback.print_exc(); self.status.set(f"Chyba feedbacku: {e}")
 
     # ---------- akce ----------
     def on_build_prog(self):
@@ -409,10 +496,10 @@ class App:
         try:
             self.status.set("Generuji…")
             _, used = be.generate(self.params(), self.preview)
-            self.status.set("Hraji…  " + " ".join(used))
+            self.status.set("Hraji…  " + " ".join(u for u in used if u))
             be.play(self.preview, port_name=self.port.get(), stop_event=self.stop_event)
             if not self.stop_event.is_set():
-                self.status.set("Hotovo.  takty: " + " ".join(used))
+                self.status.set("Hotovo.  takty: " + " ".join(u for u in used if u))
         except Exception as e:
             traceback.print_exc(); self.status.set(f"Chyba: {e}")
 

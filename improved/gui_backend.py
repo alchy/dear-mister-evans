@@ -6,7 +6,7 @@ GUI zná JEN tohle rozhraní (ne vnitřek enginu) -> backend lze vyměnit beze z
 GUI. Poskytuje: výčet voleb (OPTIONS), generování do MIDI (generate) a přehrání
 s možností Stop (play / list_ports).
 """
-import os, sys, threading
+import os, sys, json, threading, traceback
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "concept", "evans_melody_gen"))
@@ -102,7 +102,9 @@ def default_port():
 def build_recipe(params):
     """params (dict z GUI) -> recept pro pattern_engine.synth_make."""
     sub = _sub(params)
-    cells = {k: float(v) for k, v in params.get("cells", {}).items() if float(v) > 0}
+    bias = _cell_bias()                                    # MAKRO feedback (bandit) násobí váhy
+    cells = {k: float(v) * bias.get(k, 1.0)
+             for k, v in params.get("cells", {}).items() if float(v) > 0}
     if not cells:
         cells = {"markov": 1.0}
     return {
@@ -119,14 +121,190 @@ def build_recipe(params):
     }
 
 
+# ======================= FEEDBACK: párové ladění (B lepší než A) =======================
+# Dvě úrovně podle preference uživatele (klik na regeneraci -> "tahle je lepší"):
+#  A) MIKRO: preferenční Markov na intervalech, párově B counts++ / A counts-- (podlaha 0),
+#     přimíchaný do báze (Evans/prolnutí) přes FeedbackOverlay. Base zůstává zmrazený.
+#  D) MAKRO: bandit nad vahami typů buněk (recipe "cells") -> _CELL_BIAS násobí váhy.
+# Zdroj pravdy = jazz_feedback.json (události + legacy "liked"); model se z něj REPLAYuje
+# při startu, takže ladění přežije restart. Každá událost jde i na stdout ([FEEDBACK]).
+FB_PATH = os.path.join(os.getcwd(), "jazz_feedback.json")
+W_BETTER, W_WORSE = 1.0, 0.5          # přírůstek lepší / úbytek horší fráze
+BANDIT_ETA = 0.15                     # krok multiplikativní úpravy vah buněk
+BIAS_LO, BIAS_HI = 0.25, 4.0          # meze biasu vah buněk
+_FB = None                            # preferenční MotionMarkov (mikro)
+_CELL_BIAS = {}                       # {typ buňky: násobitel váhy} (makro)
+_N_EVENTS = 0                         # počet párových událostí (roste -> váha overlaye)
+
+
+class FeedbackOverlay:
+    """Přimíchá preferenční model: s pravděpodobností w vezme krok z naučených
+    preferencí, jinak z báze (Evans/prolnutí). Drží rozhraní .sample/.order."""
+    def __init__(self, base, fb, w=0.4):
+        self.base = base; self.fb = fb; self.w = w
+        self.order = getattr(base, "order", 2)
+
+    def sample(self, ctx, temperature=1.0, rng=None):
+        if rng is not None and self.w > 0 and rng.random() < self.w:
+            try:
+                return self.fb.sample(ctx, temperature, rng)
+            except Exception:
+                pass
+        return self.base.sample(ctx, temperature, rng)
+
+    def sample_start(self, temperature=1.0, rng=None):
+        if rng is not None and self.w > 0 and rng.random() < self.w:
+            try:
+                return self.fb.sample_start(temperature, rng)
+            except Exception:
+                pass
+        return self.base.sample_start(temperature, rng)
+
+
+def _pitch_tokens(pitches, sub):
+    """Fráze (MIDI tóny v pořadí) -> [(interval, rytmická_třída)] jako v melody_v2."""
+    from melody_v2 import nearest_bucket
+    bucket = nearest_bucket(1.0 / max(1, int(sub)))
+    return [(max(-12, min(12, int(pitches[i]) - int(pitches[i - 1]))), bucket)
+            for i in range(1, len(pitches))]
+
+
+def _bump(counter, key, amount):
+    """Float-count úprava s podlahou 0 (nuly mažeme -> backoff na nižší řád/bázi)."""
+    v = counter.get(key, 0.0) + amount
+    if v > 1e-9:
+        counter[key] = v
+    elif key in counter:
+        del counter[key]
+
+
+def _pref_update(model, pitches, sub, amount):
+    """amount>0 posílí, amount<0 zeslabí přechody fráze ve VŠECH backoff řádech."""
+    ph = _pitch_tokens(pitches, sub)
+    if not ph:
+        return
+    _bump(model.starts, ph[0], amount)
+    for i in range(1, len(ph)):
+        for k in range(model.order + 1):
+            if i - k < 0:
+                continue
+            ctx = tuple(ph[i - k:i])
+            _bump(model.tables[k][ctx], ph[i], amount)
+            if not model.tables[k][ctx]:
+                del model.tables[k][ctx]
+
+
+def _bandit_update(bcell, wcell):
+    """MAKRO: odměň typ buňky lepší fráze, potrestej typ horší (multiplikativně)."""
+    if bcell:
+        _CELL_BIAS[bcell] = max(BIAS_LO, min(BIAS_HI, _CELL_BIAS.get(bcell, 1.0) * (1 + BANDIT_ETA)))
+    if wcell and wcell != bcell:
+        _CELL_BIAS[wcell] = max(BIAS_LO, min(BIAS_HI, _CELL_BIAS.get(wcell, 1.0) * (1 - BANDIT_ETA)))
+
+
+def _apply_event(ev):
+    """Aplikuj jednu párovou událost na živý model + bias (sdíleno se startovním replayem)."""
+    global _N_EVENTS
+    _pref_update(_FB, ev["better"], ev.get("sub", 2), +W_BETTER)
+    if ev.get("worse"):
+        _pref_update(_FB, ev["worse"], ev.get("sub", 2), -W_WORSE)
+    bc, wc = ev.get("bcell"), ev.get("wcell")
+    if bc and wc and bc != wc:                            # typ buňky rozlišuje jen když se liší
+        _bandit_update(bc, wc)
+    _N_EVENTS += 1
+
+
+def _fb_model():
+    """Líně sestav preferenční model REPLAYEM jazz_feedback.json (zdroj pravdy)."""
+    global _FB, _CELL_BIAS, _N_EVENTS
+    if _FB is None:
+        from melody_v2 import MotionMarkov
+        _FB = MotionMarkov(order=2); _CELL_BIAS = {}; _N_EVENTS = 0
+        try:
+            data = json.load(open(FB_PATH, encoding="utf-8"))
+        except Exception:
+            data = {}
+        for ph in data.get("liked", []):                  # legacy absolutní 👍
+            _pref_update(_FB, ph["pitches"], ph.get("sub", 2), +W_BETTER)
+        for ev in data.get("events", []):                 # párové události
+            _apply_event(ev)
+    return _FB
+
+
+def _cell_bias():
+    _fb_model()                                           # zajisti načtení
+    return _CELL_BIAS
+
+
+def _overlay_w():
+    """Váha přimíchání roste s počtem schválení (0.2 -> strop 0.6) = postupné ladění."""
+    return min(0.6, 0.2 + 0.05 * _N_EVENTS)
+
+
+def feedback_count():
+    return round(sum(_fb_model().starts.values()), 1)
+
+
+def _persist(mutate):
+    """Načti jazz_feedback.json, zmutuj (callback) a ulož. Vrátí True při úspěchu."""
+    try:
+        data = json.load(open(FB_PATH, encoding="utf-8")) if os.path.exists(FB_PATH) else {}
+        mutate(data)
+        with open(FB_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
+
+def _log_event(ev):
+    from evans_drill import nm
+    def desc(ps):
+        ps = [int(p) for p in ps]
+        ivs = [ps[i + 1] - ps[i] for i in range(len(ps) - 1)]
+        return f"intervaly={ivs} ({' '.join(nm(p) for p in ps)})"
+    parts = [f"[FEEDBACK] LEPŠÍ cell={ev.get('bcell')} {desc(ev['better'])}"]
+    if ev.get("worse"):
+        parts.append(f"HORŠÍ cell={ev.get('wcell')} {desc(ev['worse'])}")
+    bias = {k: round(v, 2) for k, v in _CELL_BIAS.items() if abs(v - 1.0) > 1e-6}
+    parts.append(f"cell_bias={bias} w={_overlay_w():.2f} preferencí={feedback_count()} událostí={_N_EVENTS}")
+    msg = " | ".join(parts)
+    try:                                                  # konzole nemusí umět češtinu (cp1252)
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        print(msg.encode("utf-8", "replace").decode("ascii", "replace"), flush=True)
+
+
+def prefer_variant(better, worse, sub, better_cell=None, worse_cell=None):
+    """Párový feedback: fráze 'better' je lepší než 'worse' (worse může být None =
+    absolutní 👍). MIKRO (interval model) i MAKRO (váhy buněk) + perzistence + stdout."""
+    _fb_model()                                           # zajisti načtení
+    ev = {"better": [int(p) for p in better],
+          "worse": [int(p) for p in (worse or [])],
+          "sub": int(sub), "bcell": better_cell, "wcell": worse_cell}
+    _apply_event(ev)                                      # živá mutace modelu + biasu
+    _persist(lambda d: d.setdefault("events", []).append(ev))
+    _log_event(ev)
+    return feedback_count()
+
+
+def add_liked(pitches, sub):
+    """Absolutní 👍 (bez srovnání). Zachováno pro kompatibilitu; deleguje na párový."""
+    return prefer_variant(pitches, None, sub)
+
+
 def _model_for(recipe):
     if recipe["cells"].get("markov", 0) <= 0:
         return None
     a = recipe.get("blend_alpha", 0.5)
-    if a >= 0.999:
-        return mm.get_model("evans")
-    return bl.get_blend(alpha=a, partner=recipe.get("partner", "peterson"),
-                        verbose=False) or mm.get_model("evans")
+    base = (mm.get_model("evans") if a >= 0.999 else
+            bl.get_blend(alpha=a, partner=recipe.get("partner", "peterson"),
+                         verbose=False) or mm.get_model("evans"))
+    fb = _fb_model()
+    if base is not None and sum(fb.starts.values()) > 0:   # máš-li preference -> přimíchej
+        return FeedbackOverlay(base, fb, w=_overlay_w())
+    return base
 
 
 def _parse_prog(params):
@@ -160,17 +338,19 @@ def preview_sequences(params):
     sub = recipe["rhythm"]["sub"]
     voic = V.generate_voicings(prog, center=(48 if sub == 3 else 52),
                                style=recipe.get("voicing", "basic"))
-    mel_bars = [[] for _ in prog]
+    mel_bars = [[] for _ in prog]; used = []
     try:
-        line, _ = pe.synth_generate(recipe, prog, model=_model_for(recipe),
-                                    seed=int(params.get("seed", 1)))
+        line, used = pe.synth_generate(recipe, prog, model=_model_for(recipe),
+                                       seed=int(params.get("seed", 1)),
+                                       bar_var=params.get("bar_var"))
         for onset, _dur, p in line:                # rozděl melodii po taktech (4 doby)
             bi = int(onset // 4.0)
             if 0 <= bi < len(prog):
                 mel_bars[bi].append(p)
     except Exception:
         pass
-    return [{"label": syms[i], "bass": b, "voicing": sorted(v), "mel": mel_bars[i]}
+    return [{"label": syms[i], "bass": b, "voicing": sorted(v), "mel": mel_bars[i],
+             "cell": (used[i] if i < len(used) else None)}      # typ buňky -> feedback
             for i, (b, v) in enumerate(voic)]
 
 
@@ -182,7 +362,7 @@ def generate(params, out_path):
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     _, used = pe.synth_make(recipe, prog, out_path,
                             bpm=int(params.get("bpm", 108)), model=model,
-                            seed=int(params.get("seed", 1)))
+                            seed=int(params.get("seed", 1)), bar_var=params.get("bar_var"))
     return out_path, used
 
 
