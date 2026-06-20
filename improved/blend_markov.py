@@ -105,9 +105,20 @@ class BlendMarkov:
         return _draw(_mix(self.a.starts, self.b.starts, self.alpha), temperature, rng)
 
 
-def get_blend(alpha=0.5, verbose=True):
-    """Hotový prolnutý model Evans x Peterson (None, pokud chybí data)."""
-    ev = mm.get_model("evans"); pt = train_peterson(verbose=verbose)
+def partner_model(name, verbose=False):
+    """Učený 'partner' do prolnutí: 'peterson' (cvičení) | 'lines' (daily jazz)."""
+    if name == "peterson":
+        return train_peterson(verbose=verbose)
+    if name == "lines":
+        import lines_corpus as lc
+        return lc.get_lines_model(verbose=verbose)
+    return None
+
+
+def get_blend(alpha=0.5, partner="peterson", verbose=True):
+    """Prolnutý model Evans x <partner> (None, pokud chybí data).
+    alpha = váha Evanse (1=Evans, 0=partner)."""
+    ev = mm.get_model("evans"); pt = partner_model(partner, verbose)
     if ev is None or pt is None:
         return None
     return BlendMarkov(ev, pt, alpha)
@@ -118,16 +129,17 @@ if __name__ == "__main__":
     from arrange_chords import parse_symbol
     ap = argparse.ArgumentParser()
     ap.add_argument("--chords", default="Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7")
-    ap.add_argument("--alpha", type=float, default=0.5, help="1=Evans, 0=Peterson")
+    ap.add_argument("--alpha", type=float, default=0.5, help="1=Evans, 0=partner")
+    ap.add_argument("--partner", default="peterson", choices=["peterson", "lines"])
     ap.add_argument("--bpm", type=int, default=120)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--temp", type=float, default=1.0)
     ap.add_argument("--render", default="outputs_pat/blend.mid")
     a = ap.parse_args()
     prog = [parse_symbol(s) for s in a.chords.split()]
-    model = get_blend(a.alpha)
+    model = get_blend(a.alpha, partner=a.partner)
     if model is None:
-        print("chybí data (Evans nebo Peterson)"); sys.exit(1)
+        print(f"chybí data (Evans nebo {a.partner})"); sys.exit(1)
     os.makedirs(os.path.dirname(a.render), exist_ok=True)
     mm.arrange_learned(prog, a.render, bpm=a.bpm, temperature=a.temp,
                        seed=a.seed, model=model)

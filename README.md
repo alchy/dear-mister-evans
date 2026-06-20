@@ -172,16 +172,20 @@ přechodová rozdělení s naučeným Evansovým modelem**:
 P_mix(token | kontext) = alpha · P_Evans + (1 − alpha) · P_Peterson
 ```
 
-`alpha = 1.0` → čistý Evans, `0.0` → čistý Peterson, `0.5` → vyvážené (default).
+`alpha = 1.0` → čistý Evans, `0.0` → čistý partner, `0.5` → vyvážené (default).
 Generuje se Evansovým pipeline (kostra + frázování), ale lokální pohyb i rytmus
-táhne z mixu obou stylů.
+táhne z mixu obou stylů. **Partner** (`--partner`) je učený protějšek:
+`peterson` (cvičení) nebo `lines` (reálné „Daily jazz line" pasáže).
 
 ```bash
-python improved/blend_markov.py --chords "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7" --alpha 0.5
+python improved/blend_markov.py --chords "Cm7 F7 Bbmaj7 ..." --alpha 0.5 --partner lines
 ```
 
-Další Petersonova (či jiná) cvičení stačí dát do `data_external/peterson/` —
-korpus se rozšíří automaticky.
+Materiál pro partnery (gitignored, lokálně): Petersonova cvičení do
+`data_external/peterson/`, jazzové linky do `data_external/daily_lines/` —
+korpus se rozšíří automaticky. Linky jsou husté/jednokanálové (linka + bas);
+`lines_corpus.clean_line` vytáhne čistou melodii (registrové hradlo + sledování
+nejbližšího tónu, basové údery = pauza) → model má jen ~6 % oktávových skoků.
 
 ### Syntezátor cvičení (`synth.py`)
 

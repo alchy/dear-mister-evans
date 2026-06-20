@@ -33,9 +33,10 @@ def model_for(recipe):
     if "markov" not in recipe.get("cells", {}):
         return None
     a = recipe.get("blend_alpha", 1.0)
+    partner = recipe.get("partner", "peterson")
     if a >= 0.999:
         return mm.get_model("evans")
-    m = bl.get_blend(alpha=a, verbose=False)
+    m = bl.get_blend(alpha=a, partner=partner, verbose=False)
     return m if m is not None else mm.get_model("evans")
 
 
@@ -53,6 +54,8 @@ def main():
                     choices=list(pe.RECIPES))
     ap.add_argument("--chords", default="Am7 D7 Gm7 Cm7 F7 Bbmaj7 Em7b5 A7")
     ap.add_argument("--alpha", type=float, default=None, help="prepíše blend_alpha")
+    ap.add_argument("--partner", default=None, choices=["peterson", "lines"],
+                    help="učený partner do prolnutí (markov buňka)")
     ap.add_argument("--cells", default=None, help="prepíše váhy, např. run=0.5,markov=0.5")
     ap.add_argument("--scale", default=None, help="prepíše stupnici")
     ap.add_argument("--voicing", default=None, choices=["basic", "rootless", "color"],
@@ -65,6 +68,8 @@ def main():
     recipe = copy.deepcopy(pe.RECIPES[a.recipe])
     if a.alpha is not None:
         recipe["blend_alpha"] = a.alpha
+    if a.partner is not None:
+        recipe["partner"] = a.partner
     if a.cells:
         recipe["cells"] = parse_cells(a.cells)
     if a.scale:

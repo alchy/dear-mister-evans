@@ -55,14 +55,18 @@ class App:
             ttk.Label(frm, textvariable=v_fmt(v)).grid(row=r, column=3, sticky="w", **pad)
             r += 1
 
-        # prolnutí Evans<->Peterson
-        ttk.Label(frm, text="Prolnutí (1=Evans · 0=Peterson):").grid(
+        # prolnutí Evans<->partner
+        ttk.Label(frm, text="Prolnutí (1=Evans · 0=partner):").grid(
             row=r, column=0, sticky="w", **pad)
         self.alpha = tk.DoubleVar(value=0.5)
         ttk.Scale(frm, from_=0.0, to=1.0, variable=self.alpha, orient="horizontal",
                   length=240).grid(row=r, column=1, columnspan=2, sticky="we", **pad)
         ttk.Label(frm, textvariable=v_fmt(self.alpha)).grid(row=r, column=3, sticky="w", **pad)
         r += 1
+
+        # učený partner do prolnutí
+        self.partner = tk.StringVar(value="peterson")
+        _drop(frm, r, "Partner (učený):", self.partner, be.OPTIONS["partners"], pad); r += 1
 
         # tvar akordu / stupnice / rytmus
         self.voicing = tk.StringVar(value="basic")
@@ -110,6 +114,7 @@ class App:
             "chords": self.chords.get(),
             "cells": {c: v.get() for c, v in self.cellvars.items()},
             "alpha": self.alpha.get(),
+            "partner": self.partner.get(),
             "voicing": self.voicing.get(),
             "scale": self.scale.get(),
             "rhythm": self.rhythm.get(),

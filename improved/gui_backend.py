@@ -22,6 +22,7 @@ OPTIONS = {
     "scales":   ["auto", "bebop", "pentatonic", "jazz_color"],
     "cells":    ["run", "markov", "scale", "arpeggio"],
     "rhythms":  ["trioly (3)", "osminy (2)"],
+    "partners": ["peterson", "lines"],   # učený partner do prolnutí (Evans x ?)
 }
 DEFAULT_CHORDS = "Am7 D7 Gm7 Cm7 F7 Bbmaj7 Em7b5 A7"
 
@@ -68,6 +69,7 @@ def build_recipe(params):
         "cells": cells,
         "cell_cfg": {k: dict(_CELL_CFG[k]) for k in cells if k in _CELL_CFG},
         "blend_alpha": float(params.get("alpha", 0.5)),
+        "partner": params.get("partner", "peterson"),
     }
 
 
@@ -77,7 +79,8 @@ def _model_for(recipe):
     a = recipe.get("blend_alpha", 0.5)
     if a >= 0.999:
         return mm.get_model("evans")
-    return bl.get_blend(alpha=a, verbose=False) or mm.get_model("evans")
+    return bl.get_blend(alpha=a, partner=recipe.get("partner", "peterson"),
+                        verbose=False) or mm.get_model("evans")
 
 
 def generate(params, out_path):
