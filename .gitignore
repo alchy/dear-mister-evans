@@ -24,3 +24,6 @@ pianochord_shot.png
 # OS
 .DS_Store
 Thumbs.db
+
+# GUI stav (lokální konfigurace)
+jazz_gui_state.json

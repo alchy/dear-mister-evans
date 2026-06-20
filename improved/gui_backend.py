@@ -207,6 +207,37 @@ def play(path, port_name=None, stop_event=None):
     _send(mido.MidiFile(path), port_name, stop_event)
 
 
+def describe_params(params):
+    """Jednořádkový popis VŠECH parametrů z GUI (kontext pro feedback)."""
+    r = build_recipe(params)
+    cells = ", ".join(f"{k}={v:.2f}" for k, v in r["cells"].items())
+    return ("[NASTAVENÍ] chords='{ch}' | akordů={cnt} | sub={sub} (in_four={i4}, swing={sw}) "
+            "| stupnice={sc} | voicing={vo} | buňky: [{cells}] | alpha={a} partner={pa} "
+            "| bpm={bpm} seed={sd}").format(
+        ch=params.get("chords", ""), cnt=params.get("count", "vše"),
+        sub=r["rhythm"]["sub"], i4=r["rhythm"].get("in_four"), sw=r["rhythm"].get("swing"),
+        sc=r.get("scale"), vo=r.get("voicing"), cells=cells,
+        a=r.get("blend_alpha"), pa=r.get("partner"),
+        bpm=params.get("bpm"), sd=params.get("seed"))
+
+
+def state_dict(params):
+    """Serializovatelný stav: parametry z GUI + odvozený recept + souhrn."""
+    return {"params": params, "recipe": build_recipe(params),
+            "summary": describe_params(params)}
+
+
+def describe_block(kind, label, notes):
+    """Textový popis bloku (pro výpis do stdout = jednoduchý feedback kanál)."""
+    from evans_drill import nm
+    notes = [int(n) for n in notes]
+    if kind == "chord":
+        body = " ".join(nm(n) for n in notes)
+        return f"[AKORD] {label} | tóny: {body} | MIDI {notes}"
+    body = " ".join(f"{i+1}:{nm(n)}" for i, n in enumerate(notes))
+    return f"[MELODIE] {label} | {body} | MIDI {notes}"
+
+
 def play_block(kind, notes, port_name=None, stop_event=None, bpm=108, sub=3):
     """Přehraje jeden blok náhledu: kind='chord' (akord = vše naráz) nebo
     'line' (melodie = tóny v pořadí). notes = seznam MIDI not."""

@@ -10,9 +10,10 @@ je DRY — stejná funkce pro bas i melodii. Layout je fixní (žádné přeskak
 
 Spuštění:  python improved/gui.py
 """
-import os, sys, threading, tempfile, traceback
+import os, sys, json, threading, tempfile, traceback
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
+STATE_FILE = "jazz_gui_state.json"   # ukládá se do adresáře, odkud se GUI spouští
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -25,7 +26,9 @@ DOTR = 8                             # poloměr kolečka
 LBL = 13                             # výška popisku akordu nad klaviaturou
 GAP = 14                             # mezera mezi bloky kláves (čáry voice-leadingu)
 ROW_H = LBL + WH + GAP
-COL_GAP = 30                         # mezera mezi bas a melodie klaviaturou
+COL_GAP = 18                         # mezera mezi bas a melodie klaviaturou
+BTNW = 16                            # šířka svislého tlačítka výpisu (úzké jak klávesa)
+BTN_GAP = 4
 BASS_LO, BASS_HI = 36, 64            # C2..E4  (bas + voicing)
 MEL_LO, MEL_HI = 55, 88             # G3..E6  (melodická linka)
 DOT_BASS = "#1f7ae0"                 # modrá kolečka = levá ruka
@@ -51,7 +54,12 @@ class App:
         self.stop_event = threading.Event()
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "jazz_gui_preview.mid")
+        self.state_path = os.path.join(os.getcwd(), STATE_FILE)
+        self._loading = False
+        self._job = None
         self._build()
+        self._register_traces()
+        self._load_state()            # obnov poslední konfiguraci ze souboru
         self.draw_progression()
 
     # ---------- UI skeleton ----------
@@ -115,8 +123,6 @@ class App:
         self.voicing = tk.StringVar(value="basic"); self.count = tk.StringVar(value="vše")
         self.scale = tk.StringVar(value="bebop"); self.rhythm = tk.StringVar(value="trioly (12/takt)")
         self.in_four = tk.BooleanVar(value=True)
-        for var in (self.voicing, self.count, self.rhythm):
-            var.trace_add("write", lambda *_: self.draw_progression())
         self._drop(frm, r, "Tvar akordu:", self.voicing, be.OPTIONS["voicings"], pad)
         ttk.Label(frm, text="Akordů:").grid(row=r, column=2, sticky="e", **pad)
         ttk.OptionMenu(frm, self.count, self.count.get(), *be.OPTIONS["counts"]).grid(
@@ -145,8 +151,11 @@ class App:
 
     def _build_right(self, frm):
         self.bass_w = whites(BASS_LO, BASS_HI + 1) * WW
-        self.mel_x0 = self.bass_w + COL_GAP
-        total_w = self.mel_x0 + whites(MEL_LO, MEL_HI + 1) * WW
+        self.bass_btn = self.bass_w + BTN_GAP                 # tlačítko výpisu (bas)
+        self.mel_x0 = self.bass_btn + BTNW + COL_GAP
+        self.mel_w = whites(MEL_LO, MEL_HI + 1) * WW
+        self.mel_btn = self.mel_x0 + self.mel_w + BTN_GAP     # tlačítko výpisu (melodie)
+        total_w = self.mel_btn + BTNW + 6
         nrows = max(4, len(be.DEFAULT_CHORDS.split()))
         self.kbd = tk.Canvas(frm, width=total_w + 6, height=min(8, nrows) * ROW_H + 10,
                              bg="#fafafa", highlightthickness=0)
@@ -165,6 +174,68 @@ class App:
         ttk.Label(frm, text=label, width=22).grid(row=row, column=0, sticky="w", **pad)
         ttk.OptionMenu(frm, var, var.get(), *values).grid(row=row, column=1, sticky="we", **pad)
 
+    # ---------- stav: JSON v adresáři spuštění (load při startu, save při změně) ----------
+    def _register_traces(self):
+        vs = [self.port, self.chords, self.alpha, self.partner, self.count,
+              self.voicing, self.scale, self.rhythm, self.in_four, self.bpm, self.seed]
+        vs += list(self.cellvars.values())
+        for v in vs:
+            v.trace_add("write", self._schedule_update)
+
+    def _schedule_update(self, *_):
+        if self._loading:
+            return
+        if self._job:
+            try:
+                self.root.after_cancel(self._job)
+            except Exception:
+                pass
+        self._job = self.root.after(280, self._on_change)   # debounce
+
+    def _on_change(self):
+        self._job = None
+        self._save_state()
+        self.draw_progression()
+
+    def _save_state(self):
+        try:
+            data = be.state_dict(self.params())
+            with open(self.state_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print("[STATE] " + json.dumps(data["params"], ensure_ascii=False), flush=True)
+        except Exception:
+            traceback.print_exc()
+
+    def _load_state(self):
+        try:
+            with open(self.state_path, encoding="utf-8") as f:
+                p = json.load(f).get("params", {})
+        except Exception:
+            return
+        self._loading = True
+        try:
+            def setv(var, key):
+                if key in p and p[key] not in (None, ""):
+                    try:
+                        var.set(p[key])
+                    except Exception:
+                        pass
+            for var, key in [(self.port, "port"), (self.chords, "chords"),
+                             (self.alpha, "alpha"), (self.partner, "partner"),
+                             (self.count, "count"), (self.voicing, "voicing"),
+                             (self.scale, "scale"), (self.rhythm, "rhythm"),
+                             (self.in_four, "in_four"), (self.bpm, "bpm"), (self.seed, "seed")]:
+                setv(var, key)
+            for c, v in self.cellvars.items():
+                if c in p.get("cells", {}):
+                    try:
+                        v.set(float(p["cells"][c]))
+                    except Exception:
+                        pass
+            self.status.set("Obnovena poslední konfigurace.")
+        finally:
+            self._loading = False
+
     # ---------- DRY kreslení klaviatury ----------
     def _keyboard(self, cv, x0, ky, lo, hi):
         for m in range(lo, hi + 1):                       # bílé
@@ -180,6 +251,12 @@ class App:
                 continue
             x = x0 + whites(lo, m) * WW - BW / 2
             cv.create_rectangle(x, ky, x + BW, ky + BH, fill="#222", outline="#000")
+
+    def _logbtn(self, cv, x, ky):
+        """Úzké svislé tlačítko 'výpis do stdout' vpravo od klaviatury."""
+        cv.create_rectangle(x, ky, x + BTNW, ky + WH, fill="#e7ecf5", outline="#8a9bc0")
+        cv.create_text(x + BTNW / 2, ky + WH / 2, text="≡", fill="#456",
+                       font=("Segoe UI", 12, "bold"))
 
     def _cx(self, x0, lo, hi, m):
         m = max(lo, min(hi, m))
@@ -227,6 +304,8 @@ class App:
             cv.create_text(2, y0, anchor="nw", text=row["label"], font=("Segoe UI", 9, "bold"), fill="#234")
             self._keyboard(cv, 0, ky, BASS_LO, BASS_HI)
             self._keyboard(cv, self.mel_x0, ky, MEL_LO, MEL_HI)
+            self._logbtn(cv, self.bass_btn, ky)              # tlačítka výpisu do stdout
+            self._logbtn(cv, self.mel_btn, ky)
         # čáry přesunu hlasů (bas/akord) mezi sousedními řádky
         for i in range(len(rows) - 1):
             yb = 8 + i * ROW_H + LBL + WH
@@ -248,7 +327,7 @@ class App:
     # ---------- params ----------
     def params(self):
         return {
-            "chords": self.chords.get(),
+            "chords": self.chords.get(), "port": self.port.get(),
             "cells": {c: v.get() for c, v in self.cellvars.items()},
             "alpha": self.alpha.get(), "partner": self.partner.get(),
             "count": self.count.get(), "voicing": self.voicing.get(),
@@ -269,9 +348,16 @@ class App:
         if not (ky <= y <= ky + WH):                       # mimo klávesy (popisek/mezera)
             return
         row = rows[i]
+        # tlačítka výpisu do stdout (úzká, vpravo od klaviatur)
+        if self.bass_btn <= x <= self.bass_btn + BTNW:
+            print(be.describe_block("chord", row["label"], [row["bass"]] + row["voicing"]), flush=True)
+            self.status.set(f"Vypsáno (akord {row['label']}) do stdout."); return
+        if self.mel_btn <= x <= self.mel_btn + BTNW:
+            print(be.describe_block("line", row["label"], row["mel"]), flush=True)
+            self.status.set(f"Vypsáno (melodie {row['label']}) do stdout."); return
         if x <= self.bass_w:
             kind, notes, what = "chord", [row["bass"]] + row["voicing"], f"akord {row['label']}"
-        elif x >= self.mel_x0:
+        elif self.mel_x0 <= x <= self.mel_x0 + self.mel_w:
             kind, notes, what = "line", row["mel"], f"linka {row['label']}"
         else:
             return
