@@ -20,10 +20,11 @@ from tkinter import ttk, filedialog, messagebox
 import gui_backend as be
 
 BLACK_PC = {1, 3, 6, 8, 10}
-WW, WH, BW, BH = 14, 42, 9, 27       # rozměry kláves
-GAP = 30                             # mezera mezi řádky (čáry voice-leadingu)
+WW, WH, BW, BH = 18, 55, 12, 35      # rozměry kláves (+30 %)
+DOTR = 8                             # poloměr kolečka
+GAP = 32                             # mezera mezi řádky (čáry voice-leadingu)
 ROW_H = 16 + WH + GAP
-COL_GAP = 26                         # mezera mezi bas a melodie klaviaturou
+COL_GAP = 30                         # mezera mezi bas a melodie klaviaturou
 BASS_LO, BASS_HI = 36, 64            # C2..E4  (bas + voicing)
 MEL_LO, MEL_HI = 55, 88             # G3..E6  (melodická linka)
 DOT_BASS = "#1f7ae0"                 # modrá kolečka = levá ruka
@@ -187,7 +188,7 @@ class App:
         Drží výškovou dráhu po dobu jednoho směrového běhu; při OPAKOVÁNÍ tónu
         nebo ZMĚNĚ SMĚRU poskočí další kolečko o patro výš (po MAXL patrech se
         přetočí dolů, ať to nepřeteče)."""
-        STEP, MAXL = 11, 3
+        STEP, MAXL = 13, 3
         level, prevdir = 0, 0
         for i, p in enumerate(seq):
             if i > 0:
@@ -198,10 +199,10 @@ class App:
                 if d != 0:
                     prevdir = d
             cx = self._cx(x0, lo, hi, p)
-            base = ky + (BH - 7 if p % 12 in BLACK_PC else WH - 9)
+            base = ky + (BH - 8 if p % 12 in BLACK_PC else WH - 11)
             cy = base - level * STEP
-            cv.create_oval(cx - 7, cy - 7, cx + 7, cy + 7, fill=color, outline="#333")
-            cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 7, "bold"))
+            cv.create_oval(cx - DOTR, cy - DOTR, cx + DOTR, cy + DOTR, fill=color, outline="#333")
+            cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 8, "bold"))
 
     # ---------- náhled progrese ----------
     def draw_progression(self):
