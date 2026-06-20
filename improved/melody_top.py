@@ -146,7 +146,7 @@ def declash(melody, voicings, progression, bpc=4.0):
 
 
 def render(progression, voicings, melody, path, bpm=110, beats_per_chord=4.0,
-           swing=0.1):
+           swing=0.1, comp="rhythm"):
     tpb = 240
     mid = mido.MidiFile(type=1); mid.ticks_per_beat = tpb
     meta = mido.MidiTrack(); mid.tracks.append(meta)
@@ -158,12 +158,22 @@ def render(progression, voicings, melody, path, bpm=110, beats_per_chord=4.0,
     mid.tracks += [trB, trV, trM]
     BAR = beats_per_chord
     evB, evV, evM = [], [], []
-    for i, (bass, voic) in enumerate(voicings):
-        t0 = i * BAR
-        evB.append((t0, 1, [bass])); evB.append((t0+BAR*0.95, 0, [bass]))
-        evV.append((t0, 1, voic)); evV.append((t0+BAR*0.95, 0, voic))
     def sw(t):
         return t + (swing if abs((t-int(t))-0.5) < 1e-3 else 0.0)
+    # rytmické comp vzory (offset v dobách, trvání) -- střídají se, synkopa na "and"
+    COMP = [[(0.0, 1.6), (2.5, 1.2)],
+            [(0.0, 1.2), (1.5, 0.9), (3.0, 1.0)]]
+    for i, (bass, voic) in enumerate(voicings):
+        t0 = i * BAR
+        if comp == "rhythm":
+            evB.append((t0, 1, [bass])); evB.append((t0 + 1.9, 0, [bass]))      # bas na 1
+            evB.append((t0 + 2.0, 1, [bass])); evB.append((t0 + BAR*0.95, 0, [bass]))  # a na 3
+            for off, dur in COMP[i % len(COMP)]:
+                on = sw(t0 + off)
+                evV.append((on, 1, voic)); evV.append((on + dur, 0, voic))
+        else:
+            evB.append((t0, 1, [bass])); evB.append((t0 + BAR*0.95, 0, [bass]))
+            evV.append((t0, 1, voic)); evV.append((t0 + BAR*0.95, 0, voic))
     for o, d, p in melody:
         oo = sw(o)
         evM.append((oo, 1, [p])); evM.append((oo+d, 0, [p]))

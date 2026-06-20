@@ -13,6 +13,14 @@ concept/evans_melody_gen/outputs/
 concept/evans_melody_gen/data/*.mid
 concept/evans_melody_gen/data/*.midi
 
+# externí stažená data + natrénované modely (lokální, mimo repo)
+data_external/
+models/
+
+# pomocné/scratch (screenshot demo)
+_shot.ps1
+pianochord_shot.png
+
 # OS
 .DS_Store
 Thumbs.db

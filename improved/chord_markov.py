@@ -151,10 +151,9 @@ def render(prog, out, bpm=110, seed=1):
     from motif import generate_motivic
     from melody_top import render as render_full, declash, break_repeats
     from arrange import auto_form
+    import melody_markov
     voic = generate_voicings(prog, color=False, center=60)
-    line = generate_motivic(prog, auto_form(prog), bpc=4.0, seed=seed)
-    line = declash(line, voic, prog, bpc=4.0)
-    line = break_repeats(line, prog, bpc=4.0)
+    line = melody_markov.finalize_melody(prog, voic, seed=seed)
     render_full(prog, voic, line, out, bpm=bpm)
 
 
