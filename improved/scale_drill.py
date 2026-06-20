@@ -96,41 +96,39 @@ def _pick_near(cands, near, model, ctx, rng, temperature, avoid=None):
     return min(pool, key=lambda x: abs(x - target))
 
 
-def drill_line(progression, model, kind='auto', rh_lo=60, rh_hi=84,
-               bpc=4.0, temperature=1.0, seed=None):
-    rng = random.Random(seed); ctx = []
-    # 1) ANCHORY (Markov): beat 1 = guide tone (landing), beat 3 = akord/barva uprostřed taktu
-    anchors = []                                # (global_beat, pitch, chord_idx)
-    prev = (rh_lo + rh_hi) // 2
-    for i, (r, q) in enumerate(progression):
-        g = _pick_near(guide_pitches(r, q, rh_lo, rh_hi), prev, model, ctx, rng, temperature)
-        anchors.append((i * bpc, g, i)); prev = g
-        m = _pick_near(chord_color_pitches(r, q, rh_lo, rh_hi), prev, model, ctx, rng,
-                       temperature, avoid=g)
-        anchors.append((i * bpc + 2.0, m, i)); prev = m
-    # 2) FILL osminami: scale-run mezi anchory; stupnice (jazzová) se mění dle akordu/taktu
+def drill_line(progression, model=None, kind='auto', rh_lo=60, rh_hi=84, npb=8,
+               bpc=4.0, variation=0.28, seed=None, start_dir=1):
+    """Nahoru-dolů a jeho variace: takty se střídají vzestupně/sestupně.
+    Každý takt běží jazzovou stupnici akordu v daném směru (s občasným skokem
+    nebo krátkým obratem = variace). Beat 1 = guide tone (landing), směr se po
+    taktu otočí. Stupnice se mění dle akordu (auto = pestrá paleta)."""
+    rng = random.Random(seed)
     line = []
-    for j, (bA, pA, ci) in enumerate(anchors):
-        r, q = progression[ci]
+    direction = start_dir
+    prev_last = rh_lo + 3                      # start nízko -> 1. takt má kam stoupat
+    for i, (r, q) in enumerate(progression):
         scale = jazz_scale(r, q, rh_lo - 1, rh_hi + 1, kind, rng)
         if not scale:
             continue
         idx = lambda p: min(range(len(scale)), key=lambda k: abs(scale[k] - p))
-        bB, pB = (anchors[j + 1][0], anchors[j + 1][1]) if j + 1 < len(anchors) else (bA + 2.0, pA)
-        npos = max(1, int(round((bB - bA) / 0.5)))
-        cur = scale[idx(pA)]
-        for n in range(npos):
-            pos = bA + n * 0.5
-            if n == 0:
-                pitch = pA
-            else:
-                c2, ti = idx(cur), idx(pB)
-                if c2 < ti:   c2 += 1
-                elif c2 > ti: c2 -= 1
-                else:         c2 += 1 if c2 + 1 < len(scale) else -1   # u cíle -> soused, ať neopakuje
-                cur = scale[max(0, min(len(scale) - 1, c2))]
-                pitch = cur
-            line.append((pos, 0.5 * 0.92, pitch))
+        gts = guide_pitches(r, q, rh_lo, rh_hi)
+        start = min(gts, key=lambda x: abs(x - prev_last)) if gts else scale[idx(prev_last)]
+        ci = idx(start)
+        notes = [scale[ci]]
+        for k in range(1, npb):
+            roll = rng.random()
+            if roll < 1 - variation:       move = direction        # krok ve směru
+            elif roll < 1 - variation / 3: move = direction * 2     # skok (terc)
+            else:                          move = -direction        # krátký obrat (soused)
+            ni = ci + move
+            if ni < 0 or ni >= len(scale):                          # odraz na kraji pásma
+                ni = ci - move
+            ci = max(0, min(len(scale) - 1, ni))
+            notes.append(scale[ci])
+        for k, p in enumerate(notes):
+            line.append((i * bpc + k * (bpc / npb), (bpc / npb) * 0.92, p))
+        prev_last = notes[-1]
+        direction = -direction              # střídej nahoru/dolů po taktech
     return line
 
 
