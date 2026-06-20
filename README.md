@@ -160,6 +160,28 @@ python improved/pattern_engine.py --spec triplets_in_four --chords "Am7 D7 Gm7 G
 Workflow: *dáš segment → `analyze_segment` vytáhne subdivizi/tvar buňky/chromatiku
 → spec → engine zahraje nad libovolnou progresí (+ markov variace) → cvičebnice.*
 Dnešní dril i „triplets in four" jsou v enginu vyjádřené jako specy (`SPECS`).
+Vzestupný bebopový běh ve stylu **Oscar Peterson** *Jazz Exercises* Ex.4 je spec
+`oscar_dev` (`cell_run`: chromatické obklíčení cíle + změny směru + arpeggio vsuvky).
+
+### Prolnutí stylů přes Markov (Evans × Peterson)
+
+`blend_markov.py` postaví Markov model z Petersonova cvičení a **interpoluje jeho
+přechodová rozdělení s naučeným Evansovým modelem**:
+
+```
+P_mix(token | kontext) = alpha · P_Evans + (1 − alpha) · P_Peterson
+```
+
+`alpha = 1.0` → čistý Evans, `0.0` → čistý Peterson, `0.5` → vyvážené (default).
+Generuje se Evansovým pipeline (kostra + frázování), ale lokální pohyb i rytmus
+táhne z mixu obou stylů.
+
+```bash
+python improved/blend_markov.py --chords "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7" --alpha 0.5
+```
+
+Další Petersonova (či jiná) cvičení stačí dát do `data_external/peterson/` —
+korpus se rozšíří automaticky.
 
 ## Pozadí / teorie
 
