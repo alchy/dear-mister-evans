@@ -25,6 +25,29 @@ sys.path.insert(0, os.path.join(HERE, "..", "concept", "evans_melody_gen"))
 import scale_drill as sd
 
 
+# --- kontext pro pozičně/registrově podmíněný feedback (sdíleno s gui_backend) ---
+REG_EDGES = (62, 74)            # <62 nízko | 62-73 střed | >=74 vysoko (absolutní MIDI)
+
+
+def reg_band(p):
+    """Registrové pásmo tónu (0=nízko, 1=střed, 2=vysoko)."""
+    b = 0
+    for e in REG_EDGES:
+        if p >= e:
+            b += 1
+    return b
+
+
+def pos_class(i, n):
+    """Poziční třída noty v taktu: 0=hlava (1. doba), 2=ocas (příchod do dalšího
+    akordu), 1=vnitřek. (i = index noty, n = počet not v taktu.)"""
+    if n <= 2 or i <= 0:
+        return 0
+    if i >= n - 1:
+        return 2
+    return 1
+
+
 def scale_for(r, q, lo, hi, kind):
     if kind == "jazz_color":
         return sd.color_scale(r, q, lo, hi)
@@ -102,11 +125,14 @@ def cell_arpeggio(sc, base, npb, group, cell, rng):
 
 
 def cell_markov(sc, ci, direction, npb, cell, rng, model):
-    """Naučený pohyb (interval+rytmus z Markova) snapnutý na chord-scale -> variace."""
+    """Naučený pohyb (interval+rytmus z Markova) snapnutý na chord-scale -> variace.
+    Do modelu jde i kontext (poziční třída v taktu + registrové pásmo aktuálního
+    tónu) -> pozičně/registrově podmíněný preferenční feedback."""
     notes = [sc[ci]]; ctx = []; cur = sc[ci]
-    for _ in range(1, npb):
+    for n in range(1, npb):
         if model:
-            semi, _ = model.sample(tuple(ctx[-model.order:]), cell.get("temp", 1.0), rng)
+            cond = (pos_class(n, npb), reg_band(cur))
+            semi, _ = model.sample(tuple(ctx[-model.order:]), cell.get("temp", 1.0), rng, cond=cond)
             ctx.append((semi, _))
         else:
             semi = rng.choice([-2, -1, 1, 2])

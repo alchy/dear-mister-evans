@@ -103,8 +103,9 @@ class MotionMarkov:
                 ctx = tuple(ph[i-k:i])
                 self.tables[k][ctx][ph[i]] += 1
 
-    def sample(self, ctx, temperature=1.0, rng=random):
-        """ctx = tuple poslednich tokenu. Backoff od nejdelsiho po nejkratsi."""
+    def sample(self, ctx, temperature=1.0, rng=random, cond=None):
+        """ctx = tuple poslednich tokenu. Backoff od nejdelsiho po nejkratsi.
+        cond (poziční/registrový kontext) báze ignoruje -> využije ho jen overlay."""
         for k in range(min(self.order, len(ctx)), -1, -1):
             sub = tuple(ctx[len(ctx)-k:]) if k > 0 else ()
             dist = self.tables[k].get(sub)

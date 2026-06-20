@@ -6,7 +6,8 @@ GUI zná JEN tohle rozhraní (ne vnitřek enginu) -> backend lze vyměnit beze z
 GUI. Poskytuje: výčet voleb (OPTIONS), generování do MIDI (generate) a přehrání
 s možností Stop (play / list_ports).
 """
-import os, sys, json, threading, traceback
+import os, sys, json, random, threading, traceback
+from collections import defaultdict, Counter
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "concept", "evans_melody_gen"))
@@ -123,8 +124,9 @@ def build_recipe(params):
 
 # ======================= FEEDBACK: párové ladění (B lepší než A) =======================
 # Dvě úrovně podle preference uživatele (klik na regeneraci -> "tahle je lepší"):
-#  A) MIKRO: preferenční Markov na intervalech, párově B counts++ / A counts-- (podlaha 0),
-#     přimíchaný do báze (Evans/prolnutí) přes FeedbackOverlay. Base zůstává zmrazený.
+#  A) MIKRO: preferenční model intervalů PODMÍNĚNÝ kontextem (poziční třída v taktu +
+#     registrové pásmo), párově B counts++ / A counts-- (podlaha 0), přimíchaný do
+#     báze (Evans/prolnutí) přes FeedbackOverlay. Base zůstává zmrazený.
 #  D) MAKRO: bandit nad vahami typů buněk (recipe "cells") -> _CELL_BIAS násobí váhy.
 # Zdroj pravdy = jazz_feedback.json (události + legacy "liked"); model se z něj REPLAYuje
 # při startu, takže ladění přežije restart. Každá událost jde i na stdout ([FEEDBACK]).
@@ -132,45 +134,13 @@ FB_PATH = os.path.join(os.getcwd(), "jazz_feedback.json")
 W_BETTER, W_WORSE = 1.0, 0.5          # přírůstek lepší / úbytek horší fráze
 BANDIT_ETA = 0.15                     # krok multiplikativní úpravy vah buněk
 BIAS_LO, BIAS_HI = 0.25, 4.0          # meze biasu vah buněk
-_FB = None                            # preferenční MotionMarkov (mikro)
+_FB = None                            # preferenční CondPref (mikro, podmíněný kontextem)
 _CELL_BIAS = {}                       # {typ buňky: násobitel váhy} (makro)
 _N_EVENTS = 0                         # počet párových událostí (roste -> váha overlaye)
 
 
-class FeedbackOverlay:
-    """Přimíchá preferenční model: s pravděpodobností w vezme krok z naučených
-    preferencí, jinak z báze (Evans/prolnutí). Drží rozhraní .sample/.order."""
-    def __init__(self, base, fb, w=0.4):
-        self.base = base; self.fb = fb; self.w = w
-        self.order = getattr(base, "order", 2)
-
-    def sample(self, ctx, temperature=1.0, rng=None):
-        if rng is not None and self.w > 0 and rng.random() < self.w:
-            try:
-                return self.fb.sample(ctx, temperature, rng)
-            except Exception:
-                pass
-        return self.base.sample(ctx, temperature, rng)
-
-    def sample_start(self, temperature=1.0, rng=None):
-        if rng is not None and self.w > 0 and rng.random() < self.w:
-            try:
-                return self.fb.sample_start(temperature, rng)
-            except Exception:
-                pass
-        return self.base.sample_start(temperature, rng)
-
-
-def _pitch_tokens(pitches, sub):
-    """Fráze (MIDI tóny v pořadí) -> [(interval, rytmická_třída)] jako v melody_v2."""
-    from melody_v2 import nearest_bucket
-    bucket = nearest_bucket(1.0 / max(1, int(sub)))
-    return [(max(-12, min(12, int(pitches[i]) - int(pitches[i - 1]))), bucket)
-            for i in range(1, len(pitches))]
-
-
 def _bump(counter, key, amount):
-    """Float-count úprava s podlahou 0 (nuly mažeme -> backoff na nižší řád/bázi)."""
+    """Float-count úprava s podlahou 0 (nuly mažeme -> backoff na nižší úroveň/bázi)."""
     v = counter.get(key, 0.0) + amount
     if v > 1e-9:
         counter[key] = v
@@ -178,20 +148,82 @@ def _bump(counter, key, amount):
         del counter[key]
 
 
-def _pref_update(model, pitches, sub, amount):
-    """amount>0 posílí, amount<0 zeslabí přechody fráze ve VŠECH backoff řádech."""
-    ph = _pitch_tokens(pitches, sub)
-    if not ph:
-        return
-    _bump(model.starts, ph[0], amount)
-    for i in range(1, len(ph)):
-        for k in range(model.order + 1):
-            if i - k < 0:
-                continue
-            ctx = tuple(ph[i - k:i])
-            _bump(model.tables[k][ctx], ph[i], amount)
-            if not model.tables[k][ctx]:
-                del model.tables[k][ctx]
+def _draw_iv(counter, temperature, rng):
+    """Losuj klíč z Counteru úměrně vahám (s teplotou)."""
+    items, weights = zip(*counter.items())
+    if temperature != 1.0:
+        weights = [w ** (1.0 / max(1e-6, temperature)) for w in weights]
+    tot = sum(weights); x = rng.random() * tot; acc = 0.0
+    for it, w in zip(items, weights):
+        acc += w
+        if x <= acc:
+            return it
+    return items[-1]
+
+
+class CondPref:
+    """Preferenční model intervalů PODMÍNĚNÝ kontextem = (poziční třída v taktu,
+    registrové pásmo zdrojového tónu). Učí se z 👍/párových frází (float counts,
+    podlaha 0). sample(cond) vrací interval s multi-level backoffem:
+    (pozice,pásmo) -> pozice -> pásmo -> globál. starts = intervaly 1. kroku
+    (aktivace overlaye + počet)."""
+    def __init__(self):
+        self.tab = defaultdict(Counter)        # ctx-klíč -> Counter(interval -> váha)
+        self.starts = Counter()
+
+    @staticmethod
+    def _keys(pos, band):                      # od nejkonkrétnějšího po globální
+        return ((pos, band), (pos,), ("band", band), ())
+
+    def update(self, pitches, amount):
+        """amount>0 posílí, amount<0 zeslabí intervaly fráze ve VŠECH úrovních kontextu."""
+        n = len(pitches)
+        for i in range(1, n):
+            iv = max(-12, min(12, int(pitches[i]) - int(pitches[i - 1])))
+            pos = pe.pos_class(i, n); band = pe.reg_band(int(pitches[i - 1]))
+            for k in self._keys(pos, band):
+                _bump(self.tab[k], iv, amount)
+                if not self.tab[k]:
+                    del self.tab[k]
+            if i == 1:
+                _bump(self.starts, iv, amount)
+
+    def sample(self, cond, temperature=1.0, rng=None):
+        rng = rng or random
+        pos, band = cond
+        for k in self._keys(pos, band):
+            d = self.tab.get(k)
+            if d and sum(d.values()) >= 1.0:
+                return _draw_iv(d, temperature, rng)
+        return None
+
+
+class FeedbackOverlay:
+    """Přimíchá preferenční model: s pravděpodobností w vezme interval z naučených
+    preferencí (podmíněných pozicí+registrem přes cond), jinak z báze (Evans/prolnutí).
+    cond = (poziční třída, registrové pásmo) z cell_markov; báze ho ignoruje."""
+    def __init__(self, base, fb, w=0.4):
+        self.base = base; self.fb = fb; self.w = w
+        self.order = getattr(base, "order", 2)
+
+    def sample(self, ctx, temperature=1.0, rng=None, cond=None):
+        if rng is not None and self.w > 0 and cond is not None and rng.random() < self.w:
+            try:
+                iv = self.fb.sample(cond, temperature, rng)
+                if iv is not None:
+                    return (iv, 0.5)               # interval -> token (rytmus řeší cell)
+            except Exception:
+                pass
+        return self.base.sample(ctx, temperature, rng, cond=cond)
+
+    def sample_start(self, temperature=1.0, rng=None):
+        if (rng is not None and self.w > 0 and sum(self.fb.starts.values()) > 0
+                and rng.random() < self.w):
+            try:
+                return (_draw_iv(self.fb.starts, temperature, rng), 0.5)
+            except Exception:
+                pass
+        return self.base.sample_start(temperature, rng)
 
 
 def _bandit_update(bcell, wcell):
@@ -205,9 +237,9 @@ def _bandit_update(bcell, wcell):
 def _apply_event(ev):
     """Aplikuj jednu párovou událost na živý model + bias (sdíleno se startovním replayem)."""
     global _N_EVENTS
-    _pref_update(_FB, ev["better"], ev.get("sub", 2), +W_BETTER)
+    _FB.update(ev["better"], +W_BETTER)
     if ev.get("worse"):
-        _pref_update(_FB, ev["worse"], ev.get("sub", 2), -W_WORSE)
+        _FB.update(ev["worse"], -W_WORSE)
     bc, wc = ev.get("bcell"), ev.get("wcell")
     if bc and wc and bc != wc:                            # typ buňky rozlišuje jen když se liší
         _bandit_update(bc, wc)
@@ -218,14 +250,13 @@ def _fb_model():
     """Líně sestav preferenční model REPLAYEM jazz_feedback.json (zdroj pravdy)."""
     global _FB, _CELL_BIAS, _N_EVENTS
     if _FB is None:
-        from melody_v2 import MotionMarkov
-        _FB = MotionMarkov(order=2); _CELL_BIAS = {}; _N_EVENTS = 0
+        _FB = CondPref(); _CELL_BIAS = {}; _N_EVENTS = 0
         try:
             data = json.load(open(FB_PATH, encoding="utf-8"))
         except Exception:
             data = {}
         for ph in data.get("liked", []):                  # legacy absolutní 👍
-            _pref_update(_FB, ph["pitches"], ph.get("sub", 2), +W_BETTER)
+            _FB.update(ph["pitches"], +W_BETTER)
         for ev in data.get("events", []):                 # párové události
             _apply_event(ev)
     return _FB

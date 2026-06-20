@@ -97,7 +97,7 @@ class BlendMarkov:
                 return dist
         return m.tables[0].get(()) or Counter({(0, 0.5): 1})
 
-    def sample(self, ctx, temperature=1.0, rng=random):
+    def sample(self, ctx, temperature=1.0, rng=random, cond=None):
         da = self._backoff(self.a, ctx); db = self._backoff(self.b, ctx)
         return _draw(_mix(da, db, self.alpha), temperature, rng)
 
