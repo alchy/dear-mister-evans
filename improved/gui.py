@@ -20,11 +20,11 @@ from tkinter import ttk, filedialog, messagebox
 import gui_backend as be
 
 BLACK_PC = {1, 3, 6, 8, 10}
-WW, WH, BW, BH = 18, 55, 12, 35      # rozměry kláves (+30 %)
-DOTR = 8                             # poloměr kolečka
+WW, WH, BW, BH = 10, 55, 7, 35       # rozměry kláves (užší = úspora místa)
+DOTR = 7                             # poloměr kolečka
 GAP = 32                             # mezera mezi řádky (čáry voice-leadingu)
 ROW_H = 16 + WH + GAP
-COL_GAP = 30                         # mezera mezi bas a melodie klaviaturou
+COL_GAP = 22                         # mezera mezi bas a melodie klaviaturou
 BASS_LO, BASS_HI = 36, 64            # C2..E4  (bas + voicing)
 MEL_LO, MEL_HI = 55, 88             # G3..E6  (melodická linka)
 DOT_BASS = "#1f7ae0"                 # modrá kolečka = levá ruka
@@ -186,20 +186,21 @@ class App:
     def _seq(self, cv, x0, ky, lo, hi, seq, color):
         """DRY: posloupnost tónů jako očíslovaná kolečka v pořadí hraní.
         Drží výškovou dráhu po dobu jednoho směrového běhu; při OPAKOVÁNÍ tónu
-        nebo ZMĚNĚ SMĚRU poskočí další kolečko o patro výš (po MAXL patrech se
-        přetočí dolů, ať to nepřeteče)."""
+        nebo ZMĚNĚ SMĚRU poskočí další kolečko o patro výš (jen stropuje, nikdy
+        zpět dolů -> menší číslo není nikdy nad větším). Jednotná základna pro
+        bílé i černé klávesy, ať černá nevyskočí nad sousední bílou."""
         STEP, MAXL = 13, 3
+        base = ky + WH - 11                       # jednotná základna (bílé i černé)
         level, prevdir = 0, 0
         for i, p in enumerate(seq):
             if i > 0:
                 prev = seq[i - 1]
                 d = (p > prev) - (p < prev)
                 if p == prev or (d != 0 and prevdir != 0 and d != prevdir):
-                    level = level + 1 if level < MAXL else 0
+                    level = min(MAXL, level + 1)
                 if d != 0:
                     prevdir = d
             cx = self._cx(x0, lo, hi, p)
-            base = ky + (BH - 8 if p % 12 in BLACK_PC else WH - 11)
             cy = base - level * STEP
             cv.create_oval(cx - DOTR, cy - DOTR, cx + DOTR, cy + DOTR, fill=color, outline="#333")
             cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 8, "bold"))
