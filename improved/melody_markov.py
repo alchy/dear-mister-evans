@@ -287,7 +287,7 @@ def get_model(source="all"):
     return m
 
 
-def best_melody(progression, seed=1, temperature=1.0, source="all", bpc=4.0):
+def best_melody(progression, seed=1, temperature=1.0, source="evans", bpc=4.0):
     """Naučená melodie (pokud jsou data), jinak fallback na pravidlovou (motif)."""
     model = get_model(source)
     if model is not None:
@@ -300,7 +300,7 @@ def best_melody(progression, seed=1, temperature=1.0, source="all", bpc=4.0):
     return generate_motivic(progression, auto_form(progression), bpc=bpc, seed=seed)
 
 
-def finalize_melody(progression, voic, seed=1, temperature=1.0, source="all", bpc=4.0):
+def finalize_melody(progression, voic, seed=1, temperature=1.0, source="evans", bpc=4.0):
     """Hotová melodická linka (naučená/fallback) + declash + anti-opakování."""
     line = best_melody(progression, seed=seed, temperature=temperature, source=source, bpc=bpc)
     line = declash(line, voic, progression, bpc=bpc)
