@@ -90,11 +90,15 @@ pevný.)
 4. `feedback`: tvarování modelu (volný drift) + interakce.
 5. slim GUI nad slim fasádou (~5 os).
 
-## 10. Otevřená rozhodnutí (k potvrzení)
-- **A. Prostor modelu:** scale-degree (doporučeno) vs půltóny. → navrhuji scale-degree.
-- **B. Harmonie pro Evansův prior:** degree-agnostický prior (metric+register+contour) a
-  degree-podmínění až z feedbacku (robustní), vs zkusit přibližnou detekci akordů pro
-  prior. → navrhuji degree-agnostický prior + degree z feedbacku.
-- **C. Rytmus v1:** pevná mřížka (doporučeno) vs hned učený rytmus.
-- **D. Balík/název:** `improved/voice/` vs jiný. (kosmetika)
-- **E. GUI náhled:** zachovat klaviaturový náhled, nebo jednodušší (piano-roll / textový)?
+## 10. Rozhodnutí (ODSOUHLASENO)
+- **A. Prostor modelu: scale-degree** (kroky ve stupnici). ✅
+- **B. Harmonie pro prior: PŘIBLIŽNÁ DETEKCE akordů** i pro Evansův prior → prior je
+  degree-podmíněný. Využít stávající detekci (`concept/.../harmony.py` Krumhansl+Viterbi).
+  Šum ošetřit multi-level backoffem (degree → bez degree). ✅
+- **C. Rytmus v1: pevná mřížka** z hustoty (+feel). Učený rytmus = pozdější. ✅
+- **D. Balík: `improved/voice/`.** ✅
+- **E. GUI náhled: zachovat klaviaturový** (ztenčit, ne nahradit). ✅
+
+Pozn. k §4 dle B: stav modelu zahrnuje `degree` jako PLNÝ člen kontextu (ne jen
+volitelný), s backoffem `(metric,register,degree,contour) → (metric,register,contour)
+→ …` pro robustnost vůči šumu detekce.
