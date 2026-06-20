@@ -140,6 +140,13 @@ def generate_voicings(progression, color=False, center=63, style="rootless"):
                 pcs.append((pcs[0] + 7) % 12)
             pcs = pcs[:4]
             voic = build_close(pcs, center) if prev is None else voice_lead(prev, pcs)
+        if prev is None:                    # srovnej 1. akord do okna voice-leadingu
+            avg = sum(voic) / len(voic)     # (jinak skok z 1. na 2. akord)
+            while avg < WIN_LO:
+                voic = [v + 12 for v in voic]; avg += 12
+            while avg > WIN_HI:
+                voic = [v - 12 for v in voic]; avg -= 12
+            voic = sorted(voic)
         bass = 36 + (root % 12)             # zakladni ton dole (C2..B2)
         voicings.append((bass, voic))
         prev = voic

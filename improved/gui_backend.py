@@ -118,14 +118,54 @@ def _model_for(recipe):
                         verbose=False) or mm.get_model("evans")
 
 
-def generate(params, out_path):
-    """Vygeneruje MIDI dle parametrů. Vrátí (cesta, seznam typů buněk po taktech)."""
-    prog = [parse_symbol(s) for s in str(params["chords"]).split()]
-    if not prog:
+def _parse_prog(params):
+    """Symboly z pole akordů -> (progrese, symboly) se zkrácením na počet akordů."""
+    syms = str(params["chords"]).split()
+    if not syms:
         raise ValueError("prázdná progrese")
     cnt = str(params.get("count", "vše"))
     if cnt.isdigit():
-        prog = prog[:int(cnt)] or prog        # zkrať na cvičební smyčku
+        syms = syms[:int(cnt)] or syms
+    return [parse_symbol(s) for s in syms], syms
+
+
+def voicing_notes(params):
+    """Pro náhled: [(symbol, bass, [voicing seřazený])] dle tvaru akordu.
+    Voicing je seřazený -> hlas i lze párovat mezi akordy (voice-leading)."""
+    import voicings as V
+    prog, syms = _parse_prog(params)
+    sub = 3 if str(params.get("rhythm", "trioly (3)")).startswith("trioly") else 2
+    center = 48 if sub == 3 else 52
+    voic = V.generate_voicings(prog, center=center, style=params.get("voicing", "basic"))
+    return [(syms[i], b, sorted(v)) for i, (b, v) in enumerate(voic)]
+
+
+def preview_sequences(params):
+    """Pro náhled per-takt: levá ruka (bas+voicing) i melodie v POŘADÍ hraní.
+    -> [{label, bass, voicing[seřazený], mel[tóny v čase]}]. DRY pro obě části."""
+    import voicings as V
+    prog, syms = _parse_prog(params)
+    recipe = build_recipe(params)
+    sub = recipe["rhythm"]["sub"]
+    voic = V.generate_voicings(prog, center=(48 if sub == 3 else 52),
+                               style=recipe.get("voicing", "basic"))
+    mel_bars = [[] for _ in prog]
+    try:
+        line, _ = pe.synth_generate(recipe, prog, model=_model_for(recipe),
+                                    seed=int(params.get("seed", 1)))
+        for onset, _dur, p in line:                # rozděl melodii po taktech (4 doby)
+            bi = int(onset // 4.0)
+            if 0 <= bi < len(prog):
+                mel_bars[bi].append(p)
+    except Exception:
+        pass
+    return [{"label": syms[i], "bass": b, "voicing": sorted(v), "mel": mel_bars[i]}
+            for i, (b, v) in enumerate(voic)]
+
+
+def generate(params, out_path):
+    """Vygeneruje MIDI dle parametrů. Vrátí (cesta, seznam typů buněk po taktech)."""
+    prog, _ = _parse_prog(params)
     recipe = build_recipe(params)
     model = _model_for(recipe)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
