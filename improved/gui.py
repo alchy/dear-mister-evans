@@ -20,11 +20,12 @@ from tkinter import ttk, filedialog, messagebox
 import gui_backend as be
 
 BLACK_PC = {1, 3, 6, 8, 10}
-WW, WH, BW, BH = 10, 55, 7, 35       # rozměry kláves (užší = úspora místa)
-DOTR = 7                             # poloměr kolečka
-GAP = 32                             # mezera mezi řádky (čáry voice-leadingu)
-ROW_H = 16 + WH + GAP
-COL_GAP = 22                         # mezera mezi bas a melodie klaviaturou
+WW, WH, BW, BH = 18, 55, 12, 35      # rozměry kláves (+30 %)
+DOTR = 8                             # poloměr kolečka
+LBL = 13                             # výška popisku akordu nad klaviaturou
+GAP = 14                             # mezera mezi bloky kláves (čáry voice-leadingu)
+ROW_H = LBL + WH + GAP
+COL_GAP = 30                         # mezera mezi bas a melodie klaviaturou
 BASS_LO, BASS_HI = 36, 64            # C2..E4  (bas + voicing)
 MEL_LO, MEL_HI = 55, 88             # G3..E6  (melodická linka)
 DOT_BASS = "#1f7ae0"                 # modrá kolečka = levá ruka
@@ -217,14 +218,14 @@ class App:
             cv.create_text(8, 8, anchor="nw", text=f"(nelze zobrazit: {e})", fill="#a00")
             cv.config(scrollregion=(0, 0, 10, 10)); return
         for i, row in enumerate(rows):
-            y0 = 8 + i * ROW_H; ky = y0 + 14
+            y0 = 8 + i * ROW_H; ky = y0 + LBL
             cv.create_text(2, y0, anchor="nw", text=row["label"], font=("Segoe UI", 9, "bold"), fill="#234")
             self._keyboard(cv, 0, ky, BASS_LO, BASS_HI)
             self._keyboard(cv, self.mel_x0, ky, MEL_LO, MEL_HI)
         # čáry přesunu hlasů (bas/akord) mezi sousedními řádky
         for i in range(len(rows) - 1):
-            yb = 8 + i * ROW_H + 14 + WH
-            yt = 8 + (i + 1) * ROW_H + 14
+            yb = 8 + i * ROW_H + LBL + WH
+            yt = 8 + (i + 1) * ROW_H + LBL
             for ma, mb in zip(rows[i]["voicing"], rows[i + 1]["voicing"]):
                 cv.create_line(self._cx(0, BASS_LO, BASS_HI, ma), yb,
                                self._cx(0, BASS_LO, BASS_HI, mb), yt, fill=VL_LINE, width=2)
@@ -233,7 +234,7 @@ class App:
                            fill=BASS_LINE, width=1, dash=(3, 2))
         # očíslované body navrch (DRY: bas i melodie)
         for i, row in enumerate(rows):
-            ky = 8 + i * ROW_H + 14
+            ky = 8 + i * ROW_H + LBL
             self._seq(cv, 0, ky, BASS_LO, BASS_HI, [row["bass"]] + row["voicing"], DOT_BASS)
             self._seq(cv, self.mel_x0, ky, MEL_LO, MEL_HI, row["mel"], DOT_MEL)
         total_w = self.mel_x0 + whites(MEL_LO, MEL_HI + 1) * WW
