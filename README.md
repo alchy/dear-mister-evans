@@ -211,6 +211,22 @@ python improved/synth.py --voicing color --cells "markov=1.0" --alpha 0.35
 Tím se cvičení **syntetizuje** z os: *tvar akordu × typy buněk × Evans/Peterson
 mix × stupnice × rytmus* — bez zásahu do enginu (nový recept = data v `RECIPES`).
 
+### GUI (`gui.py`)
+
+Jednoduché okno (Tkinter, žádné závislosti navíc) pro běžného uživatele — vše se
+naklikává, není potřeba příkazová řádka:
+
+```bash
+python improved/gui.py
+```
+
+- slidery **vah patternů** (běh / markov / stupnice / arpeggio) a **prolnutí**
+  (Evans↔Peterson), výběr **tvaru akordu / stupnice / rytmu**, tempo, seed, port,
+- **▶ Generuj a přehraj** (poslech), **■ Stop**, **💾 Export MIDI…**, **🎲 Nový seed**.
+
+GUI mluví výhradně přes fasádu `gui_backend` (nezná vnitřek enginu) — backend lze
+vyměnit beze změny GUI.
+
 ## Pozadí / teorie
 
 - **Rootless voicings** (A/B formy) — Bill Evans / Mark Levine, *The Jazz Piano Book*.
