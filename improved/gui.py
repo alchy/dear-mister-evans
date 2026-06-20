@@ -60,6 +60,7 @@ class App:
         self.bar_var = {}             # {index taktu: číslo varianty} -> lokální regenerace
         self.prev_variant = {}        # {index taktu: {mel, cell}} -> párový feedback (A před B)
         self._last_chords = None
+        self.flip = tk.BooleanVar(value=False)   # převrátit pořadí akordů (zdola nahoru)
         self._build()
         self._register_traces()
         self._load_state()            # obnov poslední konfiguraci ze souboru
@@ -175,6 +176,9 @@ class App:
                   text="● levá ruka (bas/akord)   ● melodie   čísla = pořadí stisku   — přesun hlasu"
                   "\n(↻ = regeneruj takt · pravý klik: na LINKU = ✓ dobrý segment (beze změny), na ↻ = lepší než předchozí)"
                   ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        ttk.Checkbutton(frm, text="obrátit pořadí akordů (zdola nahoru)",
+                        variable=self.flip, command=self.draw_progression
+                        ).grid(row=2, column=0, sticky="w", pady=(2, 0))
 
     def _drop(self, frm, row, label, var, values, pad):
         ttk.Label(frm, text=label, width=22).grid(row=row, column=0, sticky="w", **pad)
@@ -301,6 +305,12 @@ class App:
             cv.create_oval(cx - DOTR, cy - DOTR, cx + DOTR, cy + DOTR, fill=color, outline="#333")
             cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 8, "bold"))
 
+    def _slot(self, i):
+        """Vizuální slot datové řádky i. Při zaškrtnutí 'flip' jde pořadí zdola
+        nahoru. Involuce -> stejnou funkcí se z kliknutého slotu získá datová řádka."""
+        n = len(getattr(self, "last_rows", []) or [])
+        return (n - 1 - i) if (n and self.flip.get()) else i
+
     # ---------- náhled progrese ----------
     def draw_progression(self):
         cv = getattr(self, "kbd", None)
@@ -317,18 +327,19 @@ class App:
             cv.create_text(8, 8, anchor="nw", text=f"(nelze zobrazit: {e})", fill="#a00")
             cv.config(scrollregion=(0, 0, 10, 10)); return
         self.last_rows = rows
+        ky_of = lambda i: 8 + self._slot(i) * ROW_H + LBL    # vrchol kláves datové řádky i
         for i, row in enumerate(rows):
-            y0 = 8 + i * ROW_H; ky = y0 + LBL
-            cv.create_text(2, y0, anchor="nw", text=row["label"], font=("Segoe UI", 9, "bold"), fill="#234")
+            ky = ky_of(i)
+            cv.create_text(2, ky - LBL, anchor="nw", text=row["label"], font=("Segoe UI", 9, "bold"), fill="#234")
             self._keyboard(cv, 0, ky, BASS_LO, BASS_HI)
             self._keyboard(cv, self.mel_x0, ky, MEL_LO, MEL_HI)
             self._logbtn(cv, self.bass_btn, ky)              # tlačítka výpisu do stdout
             self._logbtn(cv, self.mel_btn, ky)
             self._regenbtn(cv, self.mel_regen, ky, i)        # regenerace melodického taktu
-        # čáry přesunu hlasů (bas/akord) mezi sousedními řádky
+        # čáry přesunu hlasů (bas/akord) mezi sousedními akordy (dle skutečných slotů)
         for i in range(len(rows) - 1):
-            yb = 8 + i * ROW_H + LBL + WH
-            yt = 8 + (i + 1) * ROW_H + LBL
+            kyi, kyj = ky_of(i), ky_of(i + 1)
+            yb, yt = (kyi + WH, kyj) if kyj > kyi else (kyi, kyj + WH)   # hrana blíž sousedovi
             for ma, mb in zip(rows[i]["voicing"], rows[i + 1]["voicing"]):
                 cv.create_line(self._cx(0, BASS_LO, BASS_HI, ma), yb,
                                self._cx(0, BASS_LO, BASS_HI, mb), yt, fill=VL_LINE, width=2)
@@ -337,7 +348,7 @@ class App:
                            fill=BASS_LINE, width=1, dash=(3, 2))
         # očíslované body navrch (DRY: bas i melodie)
         for i, row in enumerate(rows):
-            ky = 8 + i * ROW_H + LBL
+            ky = ky_of(i)
             self._seq(cv, 0, ky, BASS_LO, BASS_HI, [row["bass"]] + row["voicing"], DOT_BASS)
             self._seq(cv, self.mel_x0, ky, MEL_LO, MEL_HI, row["mel"], DOT_MEL)
         total_w = self.mel_regen + BTNW
@@ -362,13 +373,13 @@ class App:
         if not rows:
             return
         x = self.kbd.canvasx(event.x); y = self.kbd.canvasy(event.y)
-        i = int((y - 8) // ROW_H)
-        if not (0 <= i < len(rows)):
+        slot = int((y - 8) // ROW_H)
+        if not (0 <= slot < len(rows)):
             return
-        ky = 8 + i * ROW_H + LBL
+        ky = 8 + slot * ROW_H + LBL
         if not (ky <= y <= ky + WH):                       # mimo klávesy (popisek/mezera)
             return
-        row = rows[i]
+        i = self._slot(slot); row = rows[i]                # datová řádka (involuce při flip)
         # tlačítka výpisu do stdout (úzká, vpravo od klaviatur)
         if self.bass_btn <= x <= self.bass_btn + BTNW:
             print(be.describe_block("chord", row["label"], [row["bass"]] + row["voicing"]), flush=True)
@@ -412,7 +423,7 @@ class App:
         cv.delete("playline")
         if row is None or not (0 <= row < len(getattr(self, "last_rows", []))):
             return
-        ky = 8 + row * ROW_H + LBL
+        ky = 8 + self._slot(row) * ROW_H + LBL             # slot (respektuje flip)
         y = ky + WH + 2                                    # těsně pod klávesami (mimo popisek)
         x0, x1 = (0, self.bass_w) if kind == "chord" else (self.mel_x0, self.mel_x0 + self.mel_w)
         cv.create_line(x0, y, x1, y, fill="#10c040", width=3, tags="playline")
@@ -467,12 +478,13 @@ class App:
         if not rows:
             return
         x = self.kbd.canvasx(event.x); y = self.kbd.canvasy(event.y)
-        i = int((y - 8) // ROW_H)
-        if not (0 <= i < len(rows)):
+        slot = int((y - 8) // ROW_H)
+        if not (0 <= slot < len(rows)):
             return
-        ky = 8 + i * ROW_H + LBL
+        ky = 8 + slot * ROW_H + LBL
         if not (ky <= y <= ky + WH):
             return
+        i = self._slot(slot)                               # datová řádka (involuce při flip)
         on_regen = self.mel_regen <= x <= self.mel_regen + BTNW
         on_keys = self.mel_x0 <= x <= self.mel_x0 + self.mel_w
         if not (on_regen or on_keys):
