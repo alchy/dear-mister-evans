@@ -63,6 +63,23 @@ LIBRARY = [
             ("C-moll Solar usek",     "Cm7 Gm7 C7 Fmaj7 Fm7 Bb7 Ebmaj7 Dm7b5",  120),
         ],
     },
+    {
+        "base": "triplets-in-four-evans",
+        "type": "t4",
+        "goal": "Cvičení 'TRIPLETS IN FOUR' — sestupné tercové 4-notové buňky v "
+                "triolovém rytmu nad mollovými ii-V-i. 4-notová buňka v triolách "
+                "(3/dobu) FÁZUJE proti 4/4 (3 proti 4) -> evansovský polyritmický "
+                "feel. Chromatický náběh + altered barvy na dominantě. Levá ruka "
+                "= bas + akord na takt.",
+        "progs": [
+            ("G-moll  Am7-D7-Gm7",   "Am7 D7 Gm7 Gm7",   104),
+            ("C-moll  Dm7-G7-Cm7",   "Dm7 G7 Cm7 Cm7",   104),
+            ("F-moll  Gm7-C7-Fm7",   "Gm7 C7 Fm7 Fm7",   100),
+            ("D-moll  Em7-A7-Dm7",   "Em7 A7 Dm7 Dm7",   104),
+            ("A-moll  Bm7-E7-Am7",   "Bm7 E7 Am7 Am7",   104),
+            ("E-moll  F#m7-B7-Em7",  "F#m7 B7 Em7 Em7",  100),
+        ],
+    },
 ]
 
 
@@ -98,9 +115,60 @@ Příkaz: `python improved/build_drill_library.py`
         fh.write(md)
 
 
+def write_readme_t4(folder, ex):
+    progs_md = "\n".join(
+        f"- `{name}.mid` — {symbols}" for name, symbols, _ in ex["progs"])
+    md = f"""# {ex['base']}
+
+## Co se cvičí
+{ex['goal']}
+
+## Princip "triplets in four"
+Hraje se **4-notová buňka** (sestupné arpeggio v terciích z dané stupnice) v
+**triolovém rytmu** (3 noty na dobu, 12 na takt). Protože je buňka 4-notová a
+doba má 3 triolové noty, **buňka se nezarovná s dobou a posouvá se proti 4/4**
+(polyritmus 3:4). Přízvuk (začátek doby) tak dosedá pokaždé na jiný tón buňky —
+to vytváří ten sofistikovaný, "plovoucí" jazzový (evansovský) feel.
+
+- **Začátky buněk** stoupají po terciích (buňka 1 níž, další výš…)
+- **Chromatický náběh** na začátku akordu (půltón zdola do prvního tónu)
+- **Barvy:** charakteristická jazzová stupnice dle akordu — *altered* na
+  dominantě (chromatika), *dorská* na m7, *lokrická* na m7b5…
+- **Landing** = guide tone (3./7.) každého akordu
+
+## Stavba souborů
+- **Levá ruka:** bas (kořen) + akord/takt, držený (sustain)
+- **Pravá ruka:** triolová "triplets in four" linka (viz princip výše)
+
+## Jak bylo vygenerováno
+Skript: `improved/build_drill_library.py`
+Motor: `scale_drill.make_triplets_in_four(prog, out, bpm=…)`
+Příkaz: `python improved/build_drill_library.py`
+
+## Soubory (progrese — mollové ii-V-i)
+{progs_md}
+"""
+    with open(os.path.join(folder, "README.md"), "w", encoding="utf-8") as fh:
+        fh.write(md)
+
+
 def main():
     n = 0
     for ex in LIBRARY:
+        if ex.get("type") == "t4":
+            folder = os.path.join(ROOT, ex["base"])
+            os.makedirs(folder, exist_ok=True)
+            print(f"\n=== {ex['base']} (triplets in four) ===")
+            for name, symbols, bpm in ex["progs"]:
+                try:
+                    sd.make_triplets_in_four(prog_of(symbols),
+                                             os.path.join(folder, f"{name}.mid"), bpm=bpm)
+                    print(f"  -> {name}.mid"); n += 1
+                except Exception as e:
+                    print(f"  !! {name}: {e}"); traceback.print_exc()
+            write_readme_t4(folder, ex)
+            print("  README.md")
+            continue
         for scale_key, (suffix, _) in SCALES.items():
             folder = os.path.join(ROOT, f"{ex['base']}-{suffix}")
             os.makedirs(folder, exist_ok=True)

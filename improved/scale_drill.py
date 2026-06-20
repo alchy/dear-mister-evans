@@ -193,6 +193,86 @@ def make_drill(progression, out, kind='auto', bpm=120, seed=1, model=None, swing
     return line
 
 
+# ---------------------------------------------------------------------------
+# "TRIPLETS IN FOUR" -- 4-notová sestupná TERCOVÁ buňka v TRIOLOVÉM rytmu.
+# Protože je buňka 4-notová a rytmus triolový (3 noty/dobu), buňka FÁZUJE proti
+# 4/4 (3 proti 4) -> přízvuky dosedají pokaždé na jiný tón buňky = sofistikovaný
+# evansovský feel. Začátky buněk stoupají po terciích; na začátku akordu
+# chromatický náběh (půltón zdola); barvy z charakteristické jazzové stupnice
+# (altered na dominantě, dorská na m7, ...). Landing = guide tone akordu.
+# ---------------------------------------------------------------------------
+JAZZ_COLOR = {           # charakteristická jazzová stupnice dle kvality
+    'maj7': [0,2,4,5,7,9,11], 'maj': [0,2,4,5,7,9,11], '6': [0,2,4,5,7,9,11],
+    'm7': [0,2,3,5,7,9,10], 'min': [0,2,3,5,7,9,10], 'm6': [0,2,3,5,7,9,11],
+    '7': [0,1,3,4,6,8,10],                              # altered (chromatika)
+    'sus': [0,2,5,7,9,10], 'm7b5': [0,1,3,5,6,8,10],
+    'dim7': [0,2,3,5,6,8,9,11], 'mMaj7': [0,2,3,5,7,9,11], 'aug': [0,2,4,6,8,10],
+}
+
+
+def color_scale(r, q, lo, hi):
+    pcs = set((r + o) % 12 for o in JAZZ_COLOR.get(q, [0,2,4,5,7,9,10,11]))
+    return sorted(p for p in range(lo, hi + 1) if p % 12 in pcs)
+
+
+def triplets_in_four(progression, lo=55, hi=88, bpc=4.0, npb=12, seed=None):
+    """Sestupné tercové 4-notové buňky v triolách (3/dobu, 12/takt). Začátky
+    buněk stoupají po terciích, na začátku akordu chromatický náběh, barvy z
+    charakteristické jazzové stupnice. Vrací [(onset, dur, pitch), ...]."""
+    line = []
+    for i, (r, q) in enumerate(progression):
+        sc = color_scale(r, q, lo, hi)
+        if not sc:
+            continue
+        idx = lambda p: min(range(len(sc)), key=lambda k: abs(sc[k] - p))
+        gt = guide_pitches(r, q, lo, hi)
+        base = idx(min(gt, key=lambda x: abs(x - (lo + 8)))) if gt else len(sc) // 3
+        for g in range(npb // 4):                  # 3 buňky/takt
+            top = min(len(sc) - 1, base + g * 2 + 6)
+            t = sc[top]
+            d2, d4, d6 = sc[max(0, top-2)], sc[max(0, top-4)], sc[max(0, top-6)]
+            grp = [t - 1, t, d2, d4] if g == 0 else [t, d2, d4, d6]  # g0 = chromat. náběh
+            for j, p in enumerate(grp):
+                n = g * 4 + j
+                line.append((i * bpc + n / 3.0, (1/3.0) * 0.9, p))
+    return line
+
+
+def render_line(progression, voicings, line, out, bpm=104, bpc=4.0):
+    """Obecný render: bas + akord/takt (sustain) + pravá ruka (dle vlastních
+    nástupů/délek linky), lehký akcent na beat 1."""
+    import mido
+    tpb = 240; mid = mido.MidiFile(type=1); mid.ticks_per_beat = tpb
+    meta = mido.MidiTrack(); mid.tracks.append(meta)
+    meta.append(mido.MetaMessage('set_tempo', tempo=int(60000000/bpm), time=0))
+    trB = mido.MidiTrack(); trC = mido.MidiTrack(); trD = mido.MidiTrack()
+    mid.tracks += [trB, trC, trD]
+    evB, evC, evD = [], [], []
+    for i, (bass, vo) in enumerate(voicings):
+        t0 = i * bpc
+        evB.append((t0, 1, [bass], 54)); evB.append((t0 + bpc*0.97, 0, [bass], 0))
+        evC.append((t0, 1, vo, 46)); evC.append((t0 + bpc*0.97, 0, vo, 0))
+    for o, d, p in line:
+        vel = 100 if abs(o % bpc) < 1e-3 else 90
+        evD.append((o, 1, [p], vel)); evD.append((o + d, 0, [p], 0))
+    for tr, ev in [(trB, evB), (trC, evC), (trD, evD)]:
+        fl = [(tt, ty, pp, ve) for tt, ty, ps, ve in ev for pp in ps]
+        fl.sort(key=lambda x: (x[0], x[1])); last = 0
+        for tt, ty, pp, ve in fl:
+            dt = max(0, int(round((tt - last) * tpb))); last = tt
+            tr.append(mido.Message('note_on' if ty else 'note_off',
+                                   note=int(max(1, min(127, pp))),
+                                   velocity=ve if ty else 0, time=dt))
+    mid.save(out)
+
+
+def make_triplets_in_four(progression, out, bpm=104, seed=1):
+    voic = generate_voicings(progression, color=False, center=48)
+    line = triplets_in_four(progression, seed=seed)
+    render_line(progression, voic, line, out, bpm=bpm)
+    return line
+
+
 # pár cvičných progresí (4-taktové buňky)
 DRILLS = {
     "iiVI": [(2,'m7'), (7,'7'), (0,'maj7'), (0,'maj7')],

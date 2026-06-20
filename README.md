@@ -88,18 +88,59 @@ Volby `arrange.py`:
 
 ```
 improved/
-  arrange.py       # DIRIGENT: libovolné MIDI -> Evansovská aranž (kroky 1-4)
-  harmony.py       # key-aware detekce akordů (odhad tóniny + diatonický prior + Viterbi)
-  gallery.py       # dávkové zpracování vybraných standardů do gallery/
-  voicings.py      # rootless voicingy + voice-leading (levá ruka)
-  melody_top.py    # melodie na harmonické kostře + pojistky (pravá ruka)
-  motif.py         # motivická návratnost (téma se vrátí)
-  melody_v2.py     # starší: Markov na (interval+rytmus) — z čeho jsme vyšli
-  phrases_v3.py    # starší: frázový přístup
-  player.py        # přehrávání MIDI do portu
-concept/           # původní zadání + sdílené jádro (detekce akordů, evans_drill)
-analysis/          # ověřovací skripty (probe, clash)
+  arrange.py            # DIRIGENT: libovolné MIDI -> Evansovská aranž (kroky 1-4)
+  arrange_chords.py     # aranž přímo ze zadaných akordů (--chords) / pro PianoChord
+  harmony.py            # key-aware detekce akordů (tónina + diatonický prior + Viterbi)
+  voicings.py           # rootless voicingy + voice-leading (levá ruka)
+  melody_top.py         # melodie na harmonické kostře + rytmický comp + pojistky
+  melody_markov.py      # naučená melodie (Markov: interval+rytmus z Evanse, band-aware)
+  motif.py              # motivická návratnost (téma se vrátí)
+  chord_markov.py       # generátor akordových PROGRESÍ (key-relativní Markov)
+  standards.py          # kurátorský korpus changes jazzových standardů
+  scale_drill.py        # stupnicový dril + "triplets in four" (cvičení stupnic)
+  build_set.py          # učební sada aranží -> OneDrive
+  build_drill_library.py# strukturovaná cvičebnice drilů -> OneDrive
+  player.py             # přehrávání MIDI do portu
+  extract_progression.py# příkaz MIDI->progrese (JSON) pro GUI (PianoChord)
+concept/                # původní zadání + sdílené jádro (detekce akordů, evans_drill)
+analysis/               # ověřovací skripty (probe, clash, survey, corpus...)
 ```
+
+## Generátor progresí + cvičebnice stupnic
+
+Kromě aranží umí projekt **generovat harmonii** a **cvičení stupnic**:
+
+```bash
+# vygeneruj novou akordovou progresi ve stylu sbírky (dur/moll) a přehraj v Evansově hávu
+python improved/chord_markov.py --key C --mode maj --bars 16 --render out.mid
+
+# vyrob strukturovanou cvičebnici stupnicových drilů do OneDrive
+python improved/build_drill_library.py
+```
+
+**`chord_markov.py`** — key-relativní Markov naučený z kurátorského korpusu
+standardů (`standards.py`); generuje nové funkční progrese (ii-V-I, kvintové
+kruhy, mollové kadence).
+
+**`scale_drill.py`** — cvičení stupnic nad progresí: bas + akord/takt v levé
+ruce, pravá ruka = **stupnicový dril** (8 osmin/takt, střídavě vzestupně/sestupně
++ variace, swing feel, dosedání na guide tone dalšího akordu). Stupnice se mění
+dle akordu (chord-scale teorie: bebop / pentatonika / *auto* paleta — dorská,
+lydická, altered, lokrická, melodická moll, diminished...).
+
+### "Triplets in four"
+
+Speciální cvičení (`scale_drill.triplets_in_four`): hraje se **4-notová buňka**
+(sestupné arpeggio v terciích) v **triolovém rytmu** (3 noty/dobu). Protože je
+buňka 4-notová a doba má 3 trioly, **buňka se posouvá proti 4/4** (polyritmus
+3:4) — přízvuk dosedá pokaždé na jiný tón buňky = sofistikovaný "plovoucí"
+evansovský feel. Začátky buněk stoupají po terciích, na začátku akordu je
+chromatický náběh a barvy z charakteristické jazzové stupnice (altered na
+dominantě). Inspirováno reálnou ukázkou; přesné cvičení viz README ve složce
+`triplets-in-four-evans`.
+
+Cvičebnice (`build_drill_library.py`) vyrobí do OneDrive strukturované složky
+(cíl × varianta stupnic), v každé MIDI na progresi + `README.md` s principem.
 
 ## Pozadí / teorie
 
