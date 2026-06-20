@@ -23,6 +23,7 @@ OPTIONS = {
     "cells":    ["run", "markov", "scale", "arpeggio"],
     "rhythms":  ["trioly (3)", "osminy (2)"],
     "partners": ["peterson", "lines"],   # učený partner do prolnutí (Evans x ?)
+    "counts":   ["vše", "2", "4", "6"],  # kolik akordů (taktů) z progrese
 }
 DEFAULT_CHORDS = "Am7 D7 Gm7 Cm7 F7 Bbmaj7 Em7b5 A7"
 
@@ -88,6 +89,9 @@ def generate(params, out_path):
     prog = [parse_symbol(s) for s in str(params["chords"]).split()]
     if not prog:
         raise ValueError("prázdná progrese")
+    cnt = str(params.get("count", "vše"))
+    if cnt.isdigit():
+        prog = prog[:int(cnt)] or prog        # zkrať na cvičební smyčku
     recipe = build_recipe(params)
     model = _model_for(recipe)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)

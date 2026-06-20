@@ -82,7 +82,11 @@ class App:
         self.scale = tk.StringVar(value="bebop")
         self.rhythm = tk.StringVar(value=be.OPTIONS["rhythms"][0])
         self.in_four = tk.BooleanVar(value=True)
-        _drop(frm, r, "Tvar akordu:", self.voicing, be.OPTIONS["voicings"], pad); r += 1
+        self.count = tk.StringVar(value="vše")
+        _drop(frm, r, "Tvar akordu:", self.voicing, be.OPTIONS["voicings"], pad)
+        ttk.Label(frm, text="Akordů na cvičení:").grid(row=r, column=2, sticky="e", **pad)
+        ttk.OptionMenu(frm, self.count, self.count.get(), *be.OPTIONS["counts"]).grid(
+            row=r, column=3, sticky="we", **pad); r += 1
         _drop(frm, r, "Stupnice:", self.scale, be.OPTIONS["scales"], pad); r += 1
         _drop(frm, r, "Rytmus:", self.rhythm, be.OPTIONS["rhythms"], pad)
         ttk.Checkbutton(frm, text="triplets in four (3:4)", variable=self.in_four).grid(
@@ -117,6 +121,7 @@ class App:
             "cells": {c: v.get() for c, v in self.cellvars.items()},
             "alpha": self.alpha.get(),
             "partner": self.partner.get(),
+            "count": self.count.get(),
             "voicing": self.voicing.get(),
             "scale": self.scale.get(),
             "rhythm": self.rhythm.get(),
