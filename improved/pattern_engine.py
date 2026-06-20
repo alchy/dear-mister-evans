@@ -209,17 +209,94 @@ def generate(spec, progression, model=None, seed=None):
     return no_repeats(line)
 
 
-def make(spec, progression, out, bpm=112, model=None, seed=1):
-    """Vygeneruj + vyrenderuj (bas+akord/takt + pravá ruka). Vrátí linku."""
-    line = generate(spec, progression, model=model, seed=seed)
-    center = 48 if spec["rhythm"]["sub"] == 3 else 52
-    voic = sd.generate_voicings(progression, color=False, center=center)
-    sw = spec["rhythm"].get("swing", 0)
+def _render(rh, progression, line, out, bpm, voicing="rootless"):
+    sub = rh["sub"]; center = 48 if sub == 3 else 52
+    voic = sd.generate_voicings(progression, center=center, style=voicing)
+    sw = rh.get("swing", 0)
     if sw:
         sd.render_drill(progression, voic, line, out, bpm=bpm, swing=sw)
     else:
-        sd.render_line(progression, voic, line, out, bpm=bpm)
+        ag = rh.get("group", 4) if rh.get("in_four") else 0   # 3:4 fázování
+        sd.render_line(progression, voic, line, out, bpm=bpm, accent_group=ag, sub=sub)
+
+
+def make(spec, progression, out, bpm=112, model=None, seed=1):
+    """Vygeneruj + vyrenderuj (bas+akord/takt + pravá ruka). Vrátí linku."""
+    line = generate(spec, progression, model=model, seed=seed)
+    _render(spec["rhythm"], progression, line, out, bpm, spec.get("voicing", "rootless"))
     return line
+
+
+# ---------------- SYNTEZÁTOR: mix typů buněk dle vah + prolnutí modelu ----------
+def _wchoice(weights, rng):
+    items = [(k, v) for k, v in weights.items() if v > 0]
+    tot = sum(v for _, v in items); x = rng.random() * tot; acc = 0.0
+    for k, v in items:
+        acc += v
+        if x <= acc:
+            return k
+    return items[-1][0]
+
+
+def synth_generate(recipe, progression, model=None, seed=None):
+    """Skládá cvičení PO TAKTECH: typ buňky (scale/arpeggio/run = pravidla,
+    markov = naučené/prolnuté) se losuje dle 'cells' vah. Sdílí rytmus, stupnici
+    a landing. 'markov' buňka používá předaný (i prolnutý) model."""
+    rng = random.Random(seed)
+    rh = recipe["rhythm"]; sub = rh["sub"]; group = rh.get("group", 4)
+    lo, hi = recipe.get("range", [55, 88]); bpc = 4.0; npb = sub * 4
+    kind = recipe.get("scale", "auto"); cells = recipe["cells"]
+    cfg = recipe.get("cell_cfg", {})
+    line = []; prev_last = lo + 6; used = []
+    for i, (r, q) in enumerate(progression):
+        sc = scale_for(r, q, lo - 1, hi + 1, kind)
+        if not sc:
+            continue
+        idx = lambda p: min(range(len(sc)), key=lambda k: abs(sc[k] - p))
+        ctype = _wchoice(cells, rng); used.append(ctype)
+        cell = dict(cfg.get(ctype, {})); cell["type"] = ctype
+        direction = 1 if i % 2 == 0 else -1
+        start_dir = 1 if ctype in ("arpeggio", "run") else direction
+        if recipe.get("target", "guide_tone") == "guide_tone":
+            start = guide_start(r, q, sc, lo, hi, start_dir, prev_last)
+        else:
+            start = sc[idx(prev_last)]
+        si = idx(start)
+        if ctype == "arpeggio":
+            pitches = cell_arpeggio(sc, si, npb, group, cell, rng)
+        elif ctype == "run":
+            pitches = cell_run(sc, si, npb, cell, rng)
+        elif ctype == "markov":
+            pitches = cell_markov(sc, si, direction, npb, cell, rng, model)
+        else:
+            pitches = cell_scale(sc, si, direction, npb, cell, rng)
+        for n, p in enumerate(pitches[:npb]):
+            line.append((i * bpc + n / sub, (1.0 / sub) * 0.9, p))
+        prev_last = pitches[-1] if pitches else prev_last
+    return no_repeats(line), used
+
+
+def synth_make(recipe, progression, out, bpm=110, model=None, seed=1):
+    """Syntéza cvičení z receptu (váhy typů + prolnutý model) -> MIDI."""
+    line, used = synth_generate(recipe, progression, model=model, seed=seed)
+    _render(recipe["rhythm"], progression, line, out, bpm, recipe.get("voicing", "rootless"))
+    return line, used
+
+
+# Recepty = data: jaké patterny v jakém poměru + jak prolnout model (alpha).
+RECIPES = {
+    # "triplets in four" rámec; takty střídají Petersonův běh (chromatika) a
+    # prolnutý Evans x Peterson markov (zpěvný pohyb). alpha = váha Evanse.
+    "evans_peterson_in_four": {
+        "rhythm": {"sub": 3, "group": 4, "swing": 0, "in_four": True},
+        "scale": "bebop", "target": "guide_tone", "range": [55, 88],
+        "voicing": "basic",   # základní 7-akord -> nejúspornější voice-leading
+        "cells": {"run": 0.45, "markov": 0.55},
+        "cell_cfg": {"run": {"enclose": True, "enc_p": 0.5, "skip": 0.24, "rev": 0.2},
+                     "markov": {"temp": 1.0}},
+        "blend_alpha": 0.5,
+    },
+}
 
 
 # ---------------- knihovna principů (SPECY -- data, ne kód) ----------------
@@ -249,6 +326,13 @@ SPECS = {
         "rhythm": {"sub": 3, "group": 4, "swing": 0},
         "cell": {"type": "run", "enclose": True, "enc_p": 0.5, "skip": 0.24, "rev": 0.20},
         "scale": "auto", "target": "guide_tone", "range": [55, 90],
+    },
+    # "Triplets in four" rytmus, ale tóny z prolnutého Evans x Peterson Markova:
+    # souvislý triolový proud (3:4 fázování akcentem po 4) s mixovaným pohybem.
+    "blend_in_four": {
+        "rhythm": {"sub": 3, "group": 4, "swing": 0, "in_four": True},
+        "cell": {"type": "markov", "temp": 1.0},
+        "scale": "jazz_color", "target": "guide_tone", "range": [55, 88],
     },
 }
 

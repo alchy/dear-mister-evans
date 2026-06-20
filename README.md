@@ -183,6 +183,34 @@ python improved/blend_markov.py --chords "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7"
 Další Petersonova (či jiná) cvičení stačí dát do `data_external/peterson/` —
 korpus se rozšíří automaticky.
 
+### Syntezátor cvičení (`synth.py`)
+
+Cvičení se **skládá z vah** — kombinuje pravidlové patterny a naučený Markov do
+jedné linky. Vše je recept (data):
+
+| osa | volby |
+|---|---|
+| **typy buněk** (`--cells`) | `scale`, `arpeggio`, `run` (pravidla) + `markov` (naučené/prolnuté) — váhy, losuje se po taktech |
+| **prolnutí** (`--alpha`) | `1`=Evans … `0`=Peterson (pro `markov` buňku) |
+| **tvar akordu** (`--voicing`) | `basic` (R-3-5-7) · `rootless` (Evans) · `color` (alterace) |
+| **stupnice** (`--scale`) | `auto` · `bebop` · `pentatonic` · `jazz_color` |
+| **rytmus** | `sub` (2/3), swing, „triplets in four" fázování |
+
+Voice-leading (nejúspornější přesun 4 hlasů, drží společné tóny) jede ve všech
+třech tvarech akordu — `basic` začne v základním sedmičkovém tvaru a do dalšího
+akordu přejde nejmenším pohybem.
+
+```bash
+# základní 7-akordy + půl Peterson běh / půl prolnutý markov, bebop, in-four
+python improved/synth.py --voicing basic --cells "run=0.5,markov=0.5" --alpha 0.5
+
+# barevné voicingy + čistě prolnutý markov blíž Petersonovi
+python improved/synth.py --voicing color --cells "markov=1.0" --alpha 0.35
+```
+
+Tím se cvičení **syntetizuje** z os: *tvar akordu × typy buněk × Evans/Peterson
+mix × stupnice × rytmus* — bez zásahu do enginu (nový recept = data v `RECIPES`).
+
 ## Pozadí / teorie
 
 - **Rootless voicings** (A/B formy) — Bill Evans / Mark Levine, *The Jazz Piano Book*.

@@ -46,6 +46,20 @@ ROOTLESS_COLOR = {
     'maj7': [4, 6, 11, 2],    # 3 #11 7 9    (lydicky)
     '6':    [4, 6, 9, 2],     # 3 #11 6 9
 }
+# ZAKLADNI sedmickove akordy (s zakladnim tonem): R 3 5 7 -- pro "basic" styl,
+# kde se zacina v zakladnim tvaru a pak se vede nejusornejsim presunem.
+SEVENTH = {
+    'maj':  [0, 4, 7, 11], 'maj7': [0, 4, 7, 11], '6':   [0, 4, 7, 9],
+    'min':  [0, 3, 7, 10], 'm7':   [0, 3, 7, 10], 'm6':  [0, 3, 7, 9],
+    '7':    [0, 4, 7, 10],  'sus':  [0, 5, 7, 10],
+    'm7b5': [0, 3, 6, 10], 'dim7': [0, 3, 6, 9],
+    'mMaj7':[0, 3, 7, 11], 'aug':  [0, 4, 8, 10],
+}
+
+
+def seventh_pcs(root, quality):
+    offs = SEVENTH.get(quality, SEVENTH['maj7'])
+    return [(root + o) % 12 for o in offs]   # pořadí R 3 5 7
 
 WIN_LO, WIN_HI = 52, 76       # pasmo voicingu (vrchni ton ~C4..C5)
 
@@ -94,14 +108,38 @@ def voice_lead(prev, pcs):
             best_cost, best = cost, sorted(placed)
     return best or build_close(pcs)
 
-def generate_voicings(progression, color=False, center=63):
+def build_stack(pcs_in_order, center=60):
+    """Naskládá tóny v daném pořadí vzestupně od spodního (root position)."""
+    voic = [36 + pcs_in_order[0]]
+    for pc in pcs_in_order[1:]:
+        nx = voic[-1] + ((pc - voic[-1]) % 12)
+        if nx == voic[-1]:
+            nx += 12
+        voic.append(nx)
+    while sum(voic) / len(voic) < center - 4:
+        voic = [v + 12 for v in voic]
+    while sum(voic) / len(voic) > center + 4:
+        voic = [v - 12 for v in voic]
+    return voic
+
+
+def generate_voicings(progression, color=False, center=63, style="rootless"):
+    """style: 'rootless' (Evans, default) | 'color' (rootless+alterace) |
+    'basic' (základní sedmičkový akord R-3-5-7, start v základním tvaru).
+    Ve všech případech se další akord vybere NEJÚSORNĚJŠÍM voice-leadingem."""
+    if style == "color":
+        color = True
     voicings, prev = [], None
     for root, q in progression:
-        pcs = pcs_for(root, q, color)
-        while len(pcs) < 4:                 # pojistka: doplnit kvintou/oktavou
-            pcs.append((pcs[0] + 7) % 12)
-        pcs = pcs[:4]
-        voic = build_close(pcs, center) if prev is None else voice_lead(prev, pcs)
+        if style == "basic":
+            pcs_ord = seventh_pcs(root, q)
+            voic = build_stack(pcs_ord, center) if prev is None else voice_lead(prev, pcs_ord)
+        else:
+            pcs = pcs_for(root, q, color)
+            while len(pcs) < 4:             # pojistka: doplnit kvintou/oktavou
+                pcs.append((pcs[0] + 7) % 12)
+            pcs = pcs[:4]
+            voic = build_close(pcs, center) if prev is None else voice_lead(prev, pcs)
         bass = 36 + (root % 12)             # zakladni ton dole (C2..B2)
         voicings.append((bass, voic))
         prev = voic

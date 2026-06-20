@@ -238,9 +238,12 @@ def triplets_in_four(progression, lo=55, hi=88, bpc=4.0, npb=12, seed=None):
     return line
 
 
-def render_line(progression, voicings, line, out, bpm=104, bpc=4.0):
+def render_line(progression, voicings, line, out, bpm=104, bpc=4.0,
+                accent_group=0, sub=0):
     """Obecný render: bas + akord/takt (sustain) + pravá ruka (dle vlastních
-    nástupů/délek linky), lehký akcent na beat 1."""
+    nástupů/délek linky), lehký akcent na beat 1.
+    accent_group>0 + sub: akcent po každých 'accent_group' triolových notách
+    (3:4 fázování "triplets in four")."""
     import mido
     tpb = 240; mid = mido.MidiFile(type=1); mid.ticks_per_beat = tpb
     meta = mido.MidiTrack(); mid.tracks.append(meta)
@@ -253,7 +256,13 @@ def render_line(progression, voicings, line, out, bpm=104, bpc=4.0):
         evB.append((t0, 1, [bass], 54)); evB.append((t0 + bpc*0.97, 0, [bass], 0))
         evC.append((t0, 1, vo, 46)); evC.append((t0 + bpc*0.97, 0, vo, 0))
     for o, d, p in line:
-        vel = 100 if abs(o % bpc) < 1e-3 else 90
+        if abs(o % bpc) < 1e-3:
+            vel = 104                                   # beat 1
+        elif accent_group and sub:
+            idx = int(round((o % bpc) * sub))           # pořadí noty v taktu
+            vel = 100 if idx % accent_group == 0 else 84   # 3:4 grupování
+        else:
+            vel = 90
         evD.append((o, 1, [p], vel)); evD.append((o + d, 0, [p], 0))
     for tr, ev in [(trB, evB), (trC, evC), (trD, evD)]:
         fl = [(tt, ty, pp, ve) for tt, ty, ps, ve in ev for pp in ps]
