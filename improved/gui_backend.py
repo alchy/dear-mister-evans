@@ -21,12 +21,23 @@ OPTIONS = {
     "voicings": ["basic", "rootless", "color"],
     "scales":   ["auto", "bebop", "pentatonic", "jazz_color"],
     "cells":    ["run", "markov", "scale", "arpeggio"],
-    "rhythms":  ["trioly (3)", "osminy (2)"],
     "partners": ["peterson", "lines"],   # učený partner do prolnutí (Evans x ?)
     "counts":   ["vše", "2", "4", "6"],  # kolik akordů (taktů) z progrese
     "roots":    ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"],
     "start_qualities": ["m7", "maj7", "7", "m7b5"],
 }
+# délka/hustota melodických not -> not na dobu (sub); not na takt = sub*4
+RHYTHMS = {
+    "čtvrtky (4/takt)":   1,
+    "osminy (8/takt)":    2,
+    "trioly (12/takt)":   3,
+    "šestnáctky (16/takt)": 4,
+}
+OPTIONS["rhythms"] = list(RHYTHMS)
+
+
+def _sub(params):
+    return RHYTHMS.get(str(params.get("rhythm", "")), 2)
 DEFAULT_CHORDS = "Am7 D7 Gm7 Cm7 F7 Bbmaj7 Em7b5 A7"
 
 # Vzory progresí v římských číslicích, jako (posun v půltónech od základního tónu,
@@ -90,7 +101,7 @@ def default_port():
 
 def build_recipe(params):
     """params (dict z GUI) -> recept pro pattern_engine.synth_make."""
-    sub = 3 if str(params.get("rhythm", "trioly (3)")).startswith("trioly") else 2
+    sub = _sub(params)
     cells = {k: float(v) for k, v in params.get("cells", {}).items() if float(v) > 0}
     if not cells:
         cells = {"markov": 1.0}
@@ -134,7 +145,7 @@ def voicing_notes(params):
     Voicing je seřazený -> hlas i lze párovat mezi akordy (voice-leading)."""
     import voicings as V
     prog, syms = _parse_prog(params)
-    sub = 3 if str(params.get("rhythm", "trioly (3)")).startswith("trioly") else 2
+    sub = _sub(params)
     center = 48 if sub == 3 else 52
     voic = V.generate_voicings(prog, center=center, style=params.get("voicing", "basic"))
     return [(syms[i], b, sorted(v)) for i, (b, v) in enumerate(voic)]

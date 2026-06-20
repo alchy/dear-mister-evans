@@ -112,7 +112,7 @@ class App:
         self._drop(frm, r, "Partner (učený):", self.partner, be.OPTIONS["partners"], pad); r += 1
 
         self.voicing = tk.StringVar(value="basic"); self.count = tk.StringVar(value="vše")
-        self.scale = tk.StringVar(value="bebop"); self.rhythm = tk.StringVar(value=be.OPTIONS["rhythms"][0])
+        self.scale = tk.StringVar(value="bebop"); self.rhythm = tk.StringVar(value="trioly (12/takt)")
         self.in_four = tk.BooleanVar(value=True)
         for var in (self.voicing, self.count, self.rhythm):
             var.trace_add("write", lambda *_: self.draw_progression())
