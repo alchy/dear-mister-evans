@@ -27,23 +27,99 @@ from line_extraction import extract_melody
 import glob
 
 EVANS_DATA = os.path.join(HERE, "..", "concept", "evans_melody_gen", "data", "be-slice*.mid")
+JAZZ_ROOT = r"C:\Users\jindr\OneDrive\Jazz Learning"
 MLO, MHI = 72, 91
+_STEP = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 
-def train(data_glob=EVANS_DATA, order=2, skip=("be-slice19.mid",), verbose=True):
-    files = [f for f in sorted(glob.glob(data_glob)) if os.path.basename(f) not in skip]
+def _local(tag):
+    return tag.split('}')[-1]
+
+
+def musicxml_notes(path):
+    """Best-effort čtení not z MusicXML -> [(onset, dur, pitch, vel)] (v dobách)."""
+    import xml.etree.ElementTree as ET
+    root = ET.parse(path).getroot()
+    notes = []
+    for part in [e for e in root if _local(e.tag) == 'part']:
+        divisions = 1.0; cursor = 0.0; prev_onset = 0.0
+        for measure in [e for e in part if _local(e.tag) == 'measure']:
+            for el in measure:
+                t = _local(el.tag)
+                if t == 'attributes':
+                    for a in el:
+                        if _local(a.tag) == 'divisions':
+                            try: divisions = float(a.text)
+                            except Exception: pass
+                elif t == 'backup':
+                    for c in el:
+                        if _local(c.tag) == 'duration':
+                            cursor -= float(c.text) / divisions
+                elif t == 'forward':
+                    for c in el:
+                        if _local(c.tag) == 'duration':
+                            cursor += float(c.text) / divisions
+                elif t == 'note':
+                    is_chord = any(_local(c.tag) == 'chord' for c in el)
+                    durdiv = 0.0; pitch = None
+                    for c in el:
+                        lc = _local(c.tag)
+                        if lc == 'duration':
+                            durdiv = float(c.text)
+                        elif lc == 'pitch':
+                            step = oct_ = None; alt = 0
+                            for pc in c:
+                                lp = _local(pc.tag)
+                                if lp == 'step': step = pc.text
+                                elif lp == 'alter': alt = int(pc.text)
+                                elif lp == 'octave': oct_ = int(pc.text)
+                            if step in _STEP and oct_ is not None:
+                                pitch = (oct_ + 1) * 12 + _STEP[step] + alt
+                    durb = durdiv / divisions
+                    onset = prev_onset if is_chord else cursor
+                    if pitch is not None:
+                        notes.append((onset, max(durb, 0.05), pitch, 90))
+                        prev_onset = onset
+                    if not is_chord:
+                        cursor += durb
+    return notes
+
+
+def gather_files(source):
+    """source: 'evans' (jen be-slice) | 'all' (celá sbírka: 1 MIDI/složku + MusicXML)."""
+    out = []
+    if source == "evans":
+        for f in sorted(glob.glob(EVANS_DATA)):
+            if os.path.basename(f) != "be-slice19.mid":
+                out.append(('mid', f))
+        return out
+    seen = set()
+    for f in sorted(glob.glob(os.path.join(JAZZ_ROOT, "**", "*.mid"), recursive=True)):
+        d = os.path.dirname(f)
+        if d not in seen:
+            seen.add(d); out.append(('mid', f))
+    for f in sorted(glob.glob(os.path.join(JAZZ_ROOT, "**", "*.musicxml"), recursive=True)):
+        out.append(('xml', f))
+    return out
+
+
+def train(source="evans", order=2, verbose=True):
+    files = gather_files(source)
     model = MotionMarkov(order=order)
-    ntok = 0
-    for f in files:
+    ntok = used = 0
+    for kind, f in files:
         try:
-            toks = melody_to_tokens(extract_melody(load_notes(f)))
+            notes = load_notes(f) if kind == 'mid' else musicxml_notes(f)
+            if not notes:
+                continue
+            toks = melody_to_tokens(extract_melody(notes))
             model.train_on(toks)
-            ntok += sum(1 for t in toks if t is not None)
-        except Exception as e:
-            if verbose:
-                print(f"  preskakuji {os.path.basename(f)}: {e}")
+            ntok += sum(1 for t in toks if t is not None); used += 1
+        except Exception:
+            continue
     if verbose:
-        print(f"melodický Markov: {len(files)} souborů, {ntok} tokenů pohybu+rytmu")
+        print(f"melodický Markov [{source}]: {used}/{len(files)} souborů, "
+              f"{ntok} tokenů pohybu+rytmu")
     return model
 
 
@@ -105,6 +181,8 @@ if __name__ == "__main__":
     ap.add_argument("--temp", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--bpm", type=int, default=110)
+    ap.add_argument("--source", default="evans", choices=["evans", "all"],
+                    help="evans = jen Evans; all = celá sbírka (MIDI + MusicXML)")
     ap.add_argument("--render", default="outputs_mel/learned_full.mid")
     a = ap.parse_args()
 
@@ -114,6 +192,6 @@ if __name__ == "__main__":
     prog = cm.to_prog(seq, cm.PC.index(a.key) if a.key in cm.PC else 0)
     print("progrese:", " | ".join(cm.to_symbols(prog)))
     os.makedirs(os.path.dirname(a.render), exist_ok=True)
-    model = train()
+    model = train(a.source)
     arrange_learned(prog, a.render, bpm=a.bpm, temperature=a.temp, seed=a.seed, model=model)
     print(f"aranž (naučená melodie) -> {a.render}")
