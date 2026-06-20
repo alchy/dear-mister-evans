@@ -186,16 +186,46 @@ def generate(params, out_path):
     return out_path, used
 
 
-def play(path, port_name=None, stop_event=None):
-    """Přehraje MIDI na zadaný port; stop_event (threading.Event) přeruší."""
+def _send(mid, port_name=None, stop_event=None):
+    """Pošle MidiFile na port; stop_event přeruší + zhasne všechny tóny."""
     import mido
     name = port_name or default_port()
     if not name:
         raise RuntimeError("Nenalezen žádný MIDI-out port.")
     with mido.open_output(name) as out:
-        for msg in mido.MidiFile(path).play():
+        for msg in mid.play():
             if stop_event is not None and stop_event.is_set():
                 break
             out.send(msg)
         for ch in range(16):
             out.send(mido.Message('control_change', channel=ch, control=123, value=0))
+
+
+def play(path, port_name=None, stop_event=None):
+    """Přehraje MIDI soubor na zadaný port; stop_event přeruší."""
+    import mido
+    _send(mido.MidiFile(path), port_name, stop_event)
+
+
+def play_block(kind, notes, port_name=None, stop_event=None, bpm=108, sub=3):
+    """Přehraje jeden blok náhledu: kind='chord' (akord = vše naráz) nebo
+    'line' (melodie = tóny v pořadí). notes = seznam MIDI not."""
+    import mido
+    notes = [int(n) for n in notes if n]
+    if not notes:
+        return
+    mid = mido.MidiFile(); tr = mido.MidiTrack(); mid.tracks.append(tr)
+    tpb = mid.ticks_per_beat
+    tr.append(mido.MetaMessage('set_tempo', tempo=int(60000000 / max(1, bpm)), time=0))
+    if kind == "chord":
+        for n in notes:                                    # všechny tóny naráz
+            tr.append(mido.Message('note_on', note=n, velocity=78, time=0))
+        tr.append(mido.Message('note_off', note=notes[0], velocity=0, time=int(tpb * 2)))
+        for n in notes[1:]:
+            tr.append(mido.Message('note_off', note=n, velocity=0, time=0))
+    else:                                                  # melodická linka v pořadí
+        d = max(1, int(tpb / max(1, sub)))
+        for n in notes:
+            tr.append(mido.Message('note_on', note=n, velocity=92, time=0))
+            tr.append(mido.Message('note_off', note=n, velocity=0, time=d))
+    _send(mid, port_name, stop_event)

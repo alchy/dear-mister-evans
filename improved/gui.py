@@ -154,8 +154,11 @@ class App:
         self.kbd.configure(yscrollcommand=sb.set)
         self.kbd.grid(row=0, column=0, sticky="n")
         sb.grid(row=0, column=1, sticky="ns")
+        self.kbd.configure(cursor="hand2")
+        self.kbd.bind("<Button-1>", self.on_kbd_click)     # klik = přehraj blok
         ttk.Label(frm, foreground="#666",
                   text="● levá ruka (bas/akord)   ● melodie   čísla = pořadí stisku   — přesun hlasu"
+                  "\n(klikni na klaviaturu: vlevo zahraje akord, vpravo melodickou linku)"
                   ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
     def _drop(self, frm, row, label, var, values, pad):
@@ -215,8 +218,10 @@ class App:
         try:
             rows = be.preview_sequences(self.params())
         except Exception as e:
+            self.last_rows = []
             cv.create_text(8, 8, anchor="nw", text=f"(nelze zobrazit: {e})", fill="#a00")
             cv.config(scrollregion=(0, 0, 10, 10)); return
+        self.last_rows = rows
         for i, row in enumerate(rows):
             y0 = 8 + i * ROW_H; ky = y0 + LBL
             cv.create_text(2, y0, anchor="nw", text=row["label"], font=("Segoe UI", 9, "bold"), fill="#234")
@@ -250,6 +255,40 @@ class App:
             "scale": self.scale.get(), "rhythm": self.rhythm.get(),
             "in_four": self.in_four.get(), "bpm": self.bpm.get(), "seed": self.seed.get(),
         }
+
+    # ---------- klik na klaviaturu = přehraj blok ----------
+    def on_kbd_click(self, event):
+        rows = getattr(self, "last_rows", None)
+        if not rows:
+            return
+        x = self.kbd.canvasx(event.x); y = self.kbd.canvasy(event.y)
+        i = int((y - 8) // ROW_H)
+        if not (0 <= i < len(rows)):
+            return
+        ky = 8 + i * ROW_H + LBL
+        if not (ky <= y <= ky + WH):                       # mimo klávesy (popisek/mezera)
+            return
+        row = rows[i]
+        if x <= self.bass_w:
+            kind, notes, what = "chord", [row["bass"]] + row["voicing"], f"akord {row['label']}"
+        elif x >= self.mel_x0:
+            kind, notes, what = "line", row["mel"], f"linka {row['label']}"
+        else:
+            return
+        if self.worker and self.worker.is_alive():
+            self.status.set("Už hraji — nejdřív Stop."); return
+        self.stop_event.clear()
+        sub = be._sub(self.params()); bpm = self.bpm.get(); port = self.port.get()
+
+        def run():
+            try:
+                self.status.set(f"Hraji {what}…")
+                be.play_block(kind, notes, port_name=port, stop_event=self.stop_event, bpm=bpm, sub=sub)
+                if not self.stop_event.is_set():
+                    self.status.set(f"Hotovo ({what}).")
+            except Exception as e:
+                traceback.print_exc(); self.status.set(f"Chyba: {e}")
+        self.worker = threading.Thread(target=run, daemon=True); self.worker.start()
 
     # ---------- akce ----------
     def on_build_prog(self):
