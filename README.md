@@ -142,6 +142,25 @@ dominantě). Inspirováno reálnou ukázkou; přesné cvičení viz README ve sl
 Cvičebnice (`build_drill_library.py`) vyrobí do OneDrive strukturované složky
 (cíl × varianta stupnic), v každé MIDI na progresi + `README.md` s principem.
 
+### Obecný pattern engine (princip = data)
+
+`pattern_engine.py` zahraje libovolný cvičný princip zadaný jako **SPEC (dict)**
+se 4 osami: `rhythm` (subdivize/grupování/swing), `cell` (tvar buňky: scale /
+arpeggio / **markov** / …), `scale` (chord-scale paleta) a `target` (landing).
+Nový princip, který skládá existující buňky = **nový spec (data), ne kód**;
+markov-buňka generuje **variace ve stylu naučeného segmentu**.
+
+```bash
+# z MIDI segmentu vytáhni fakta a navrhni spec
+python improved/analyze_segment.py "segment.mid"
+# zahraj princip (spec) nad libovolnou progresí
+python improved/pattern_engine.py --spec triplets_in_four --chords "Am7 D7 Gm7 Gm7"
+```
+
+Workflow: *dáš segment → `analyze_segment` vytáhne subdivizi/tvar buňky/chromatiku
+→ spec → engine zahraje nad libovolnou progresí (+ markov variace) → cvičebnice.*
+Dnešní dril i „triplets in four" jsou v enginu vyjádřené jako specy (`SPECS`).
+
 ## Pozadí / teorie
 
 - **Rootless voicings** (A/B formy) — Bill Evans / Mark Levine, *The Jazz Piano Book*.
