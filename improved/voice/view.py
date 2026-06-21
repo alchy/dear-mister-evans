@@ -179,7 +179,8 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                 vx = _cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i])
                 vy = y0_of(i) + g.LBL - 1
                 nx, ny = mel_pos[i + 1][0]
-                cv.create_line(vx, vy, nx, ny, fill="#e23030", width=1, dash=(3, 2))
+                cv.create_line(vx, vy, nx, ny, fill="#e23030", width=1, dash=(3, 2),
+                               arrow="last")          # hrot u landing noty (odráží flip)
     # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
         bx, by = _seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
