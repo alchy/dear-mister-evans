@@ -73,9 +73,12 @@ def _dot(cv, x, y, r, **kw):
     cv.create_oval(x - r, y - r, x + r, y + r, **kw)
 
 
-def _seq(cv, g, x0, ky, lo, hi, seq, color):
+def _seq_pos(g, x0, ky, lo, hi, seq):
+    """Pozice (cx,cy) bublin v pořadí hraní -- dráhové schodiště (patro výš při
+    opakování/změně směru). Vrací seznam pozic (kreslení dělá _dots)."""
     base = ky + g.WH - g.WW * 0.6
     level, prevdir = 0, 0
+    out = []
     for i, p in enumerate(seq):
         if i > 0:
             prev = seq[i - 1]
@@ -84,8 +87,12 @@ def _seq(cv, g, x0, ky, lo, hi, seq, color):
                 level = min(MAXL, level + 1)
             if d != 0:
                 prevdir = d
-        cx = _cx(g, x0, lo, hi, p)
-        cy = base - level * g.STEP
+        out.append((_cx(g, x0, lo, hi, p), base - level * g.STEP))
+    return out
+
+
+def _dots(cv, g, pos, color):
+    for i, (cx, cy) in enumerate(pos):
         _dot(cv, cx, cy, g.DOTR, fill=color, outline="#333")
         cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", g.fnum, "bold"))
 
@@ -131,22 +138,19 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                      outline="#2a9d3a", width=2, fill="")
         cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
-    # 1) čáry voice-leadingu mezi sousedními voicingy (dle skutečných slotů)
+    # 1) levá ruka: pozice bublin -> čáry voice-leadingu MEZI BUBLINAMI (chromatika LH),
+    #    NE na klávesy. Spojí k-tý hlas akordu i s k-tým hlasem akordu i+1.
+    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, BASS_LO, BASS_HI, [bar.bass] + sorted(bar.voicing))
+          for i, bar in enumerate(bars)]
     for i in range(n - 1):
-        kyi = y0_of(i) + g.LBL
-        kyj = y0_of(i + 1) + g.LBL
-        yb, yt = (kyi + g.WH, kyj) if kyj > kyi else (kyi, kyj + g.WH)   # hrana blíž sousedovi
-        a = sorted([bars[i].bass] + list(bars[i].voicing))
-        b = sorted([bars[i + 1].bass] + list(bars[i + 1].voicing))
-        for ma, mb in zip(a, b):
-            cv.create_line(_cx(g, 0, BASS_LO, BASS_HI, ma), yb,
-                           _cx(g, 0, BASS_LO, BASS_HI, mb), yt, fill=VL_LINE, width=1)
-    # číslovaná kolečka navrch
+        a, b = lh[i], lh[i + 1]
+        for k in range(min(len(a), len(b))):
+            cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=2)
+    # číslovaná kolečka navrch (LH + melodie)
     for i, bar in enumerate(bars):
-        ky = y0_of(i) + g.LBL
-        _seq(cv, g, 0, ky, BASS_LO, BASS_HI, [bar.bass] + sorted(bar.voicing), DOT_BASS)
+        _dots(cv, g, lh[i], DOT_BASS)
         if mel:
-            _seq(cv, g, g.mel_x0, ky, MEL_LO, MEL_HI, mel[i], DOT_MEL)
+            _dots(cv, g, _seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]), DOT_MEL)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
 

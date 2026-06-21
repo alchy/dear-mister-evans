@@ -165,8 +165,10 @@ class App:
 
     # ---- klik na klaviaturu = přehraj zobrazený blok (vlevo akord, vpravo linka) ----
     def on_kbd_click(self, event):
-        if self._draw_state is None or (self.worker and self.worker.is_alive()):
+        if self._draw_state is None:
             return
+        if self.worker and self.worker.is_alive():       # přeruš předchozí, ať klik vždy zahraje
+            self.stop.set(); self.worker.join(timeout=0.3)
         H, land, line = self._draw_state
         x = self.canvas.canvasx(event.x); y = self.canvas.canvasy(event.y)
         h = view.hit(self.canvas, x, y, len(H), width=self.canvas.winfo_width(), flip=self.flip.get())
