@@ -48,19 +48,30 @@ Melodická moll (vzestupná) `1 2 ♭3 4 5 6 7` a jejích 7 modů (faktická teo
 | 7 | **altered (super-lokrická)** | 1 ♭9 ♯9 3 ♯11 ♭13 ♭7 | **7alt** (V → moll, max napětí) |
 
 ## Mapování FUNKCE -> chord-scale (pro harmony.py)
-Generátor odvodí funkci dominanty z následujícího akordu (rozvod o kvartu výš):
+**ZÁKLAD (začít tady, 4 párování):** maj7→Iónská/**Lydická**; m7→**Dórská**;
+7→**Mixolydická**; m7♭5→**Lokrická**. Teprve pak pokročilé (melodická moll, symetrické).
+
+**Plný katalog** (generátor odvodí funkci dominanty z následujícího akordu, rozvod o kvartu výš):
 - maj7 (tónika) -> **Lydická** (♯5 -> lyd. zvětšená)
 - m7 (ii) -> **Dórská**
-- 7 -> dur (následuje maj7/dur o 4 výš) -> **Mixolydická / bebop dominant**
-- 7 -> moll (následuje m7/moll o 4 výš) -> **Altered** (mode 7) [nebo Mixo ♭6]
+- 7 -> dur -> **Mixolydická / bebop dominant** (průchod 7–root drží chord-tóny na těžké)
+- 7 -> moll -> **Altered** (mode 7) [nebo Mixo ♭6]
 - 7♯11 / tritón. subst. (nerozvádí) -> **Lydická dominanta** (mode 4)
+- 7♭9 / ♯9 -> **zmenšená půl-celý** (half-whole)
+- 7♯5 / aug / celotónová barva -> **celotónová**
 - m7♭5 -> **Lokrická ♮2** (mode 6)
-- dim7 -> zmenšená (celý-půl)
+- dim7 -> **zmenšená celý-půl** (whole-half)
 - m(maj7) tónická moll -> **melodická moll**
-Osa „inside↔outside" v lekci/UI volí krotčí (Mixo) vs napjatější (Altered) variantu.
+Bebop stupnice (přidaný průchod): dominant (7–root), dur (5–6). Osa „inside↔outside"
+v lekci/UI volí krotčí (Mixo) vs napjatější (Altered/half-whole/celotónová).
+**Pentatoniky & blues:** durová/mollová pentatonika (+ blue note) = úsporná paleta,
+dobrá na začátek („less is more") a blues; mollová pentatonika i přes dominantu/blues.
 
 ## Zdroje
 - learnjazzstandards.com — Ultimate Guide to Jazz Theory (akordy, stupnice, guide tóny, progrese).
 - jazzadvice.com — Mastering the Bebop Scale (bebop -> chord-tóny na těžké, start 1/3/5/♭7).
 - learnjazzstandards.com — Use Bebop Scales Like a Pro (chromatika, enclosure).
 - jazzguitar.be — Melodic Minor Modes (formule módů; stránka blokuje fetch, formule = faktická teorie).
+- jazzadvice.com — Jazz Scales: Everything You Need to Know (katalog + symetrické stupnice).
+- jazzlanguageworkbooks.com — Jazz Scales: A Roadmap (pořadí učení, transpozice vzorů).
+- freejazzlessons.com — Jazz Scale Runs (běh jako pojivo mezi cíli, sekvence, gradace).

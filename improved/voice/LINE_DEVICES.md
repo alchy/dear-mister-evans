@@ -34,6 +34,12 @@ Ve stupních aktuálního akordu: `1-2-3-5` (vzestup na 5), `3-5-6-8`, `5-3-2-1`
 od ♭9 (altered barva).
 → spojka `arpeggio`/`scalar` = šablona stupňů, začni u předchozího cíle, skonči na dalším.
 
+**Sekvencované fragmenty** (motivický běh): opakuj krátký vzor posunutý o stupeň
+(`CDEF-DEFG-EFGA`) místo lineárního běhu → melodický tvar. **Gradace**: dynamicky
+stupňuj k vrcholovému tónu. Běh = **pojivo mezi cíli**, ne ozdoba — má rytmus, cíl a
+mezi frázemi ticho.
+→ `scalar` spojka: varianta „sequence" (posun fragmentu) + dynamická obálka; vždy končí na cíli.
+
 ## Targeting + anticipace
 Na změně akordu miř na **3 nebo 7** nového akordu, dosedni na **silnou dobu (1, 3)**.
 **Anticipace**: dosedni na guide tón dalšího akordu už na **„and" 4. doby** (přivázat

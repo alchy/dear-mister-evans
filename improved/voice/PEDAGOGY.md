@@ -32,6 +32,9 @@ silné doby. 6. **Guide-tone linky** (3/7). 7. Stupnice/mody ukotvené k harmoni
 (zpívej → hraj → analyzuj → transponuj). 10. Jazyk/licky (abstrahuj koncept).
 11. **Prostor a zdrženlivost** (dril: 1 takt hraj, 3 ticho). 12. Celé skladby.
 Zásada „less is more": začátečníci přehrávají; cvič i pauzy.
+**Pořadí stupnic (roadmap):** začni v C se 3 mody (dur/mixo/dór) + pentatonika+blue note;
+nejdřív zvládni rytmus/artikulaci, pak spoj s melodií; do dalších tónin (F, B♭…)
+**transponuj naučené vzory** (srovnávací reference, ne dril každé tóniny zvlášť).
 
 ## Tutor smyčka (jedna lekce)
 1. **VYSVĚTLI** krátce: jeden koncept + jeden měřitelný cíl.
