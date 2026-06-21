@@ -96,6 +96,10 @@ class App:
         ttk.Label(g2, text="Seed:").grid(row=2, column=0, sticky="w", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(g2, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=1, sticky="w", **pad)
+        ttk.Label(g2, text="Rozložení:").grid(row=2, column=2, sticky="e", **pad)
+        self.voicing = tk.StringVar(value="rootless")
+        ttk.OptionMenu(g2, self.voicing, "rootless", "rootless", "basic", "color").grid(
+            row=2, column=3, sticky="w", **pad)
 
         # === Přehrávání ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
@@ -180,7 +184,7 @@ class App:
 
     def _gen_play(self):
         try:
-            H = Harmony(self.chords.get(), color=self.color.get())
+            H = Harmony(self.chords.get(), color=self.color.get(), voicing=self.voicing.get())
             line = build.generate(H, density=self.density.get(),
                                   seed=self.seed.get(), approach=self.approach.get())
             _, landings = build.guide_path(H)

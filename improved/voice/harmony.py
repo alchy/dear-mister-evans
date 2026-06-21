@@ -86,10 +86,15 @@ class Bar:
 class Harmony:
     """Progrese (string/[(root,q)]) -> [Bar]. Chord-scale dle FUNKCE (kontextově,
     z následujícího akordu). color = 'inside' | 'outside' (napětí dominant->moll)."""
-    def __init__(self, progression, lo=55, hi=88, center=63, color="inside"):
-        self.lo, self.hi, self.center, self.color = lo, hi, center, color
+    def __init__(self, progression, lo=55, hi=88, center=None, color="inside",
+                 voicing="rootless", voicing_center=52):
+        # center = referenční rejstřík MELODIE; voicing_center = kam staví LEVÁ ruka
+        # (níž, ~C3-E4, ať se 4-tónový voicing vejde do bas klaviatury náhledu).
+        self.lo, self.hi = lo, hi
+        self.center = center if center is not None else (lo + hi) // 2
+        self.color = color
         prog = self._parse(progression)
-        voics = V.generate_voicings(prog, center=center, style="rootless")
+        voics = V.generate_voicings(prog, center=voicing_center, style=voicing)
         self.bars = []
         for i, (root, q) in enumerate(prog):
             nr, nq = prog[(i + 1) % len(prog)]
