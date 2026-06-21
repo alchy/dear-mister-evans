@@ -119,6 +119,13 @@ class App:
         self.voicing = tk.StringVar(value=voi.LABELS["rootless"])
         ttk.OptionMenu(g2, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
             row=3, column=1, columnspan=3, sticky="we", **pad)
+        ttk.Label(g2, text="Obklíčení:").grid(row=4, column=0, sticky="w", **pad)
+        self.enclose = tk.DoubleVar(value=0.0)
+        ttk.Spinbox(g2, from_=0.0, to=1.0, increment=0.1, textvariable=self.enclose, width=5).grid(
+            row=4, column=1, sticky="w", **pad)
+        self.bebop = tk.BooleanVar(value=False)
+        ttk.Checkbutton(g2, text="Bebop stupnice", variable=self.bebop).grid(
+            row=4, column=2, columnspan=2, sticky="w", **pad)
 
         # === Přehrávání ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
@@ -174,6 +181,8 @@ class App:
         p = les.get("preset", {})
         if "density" in p: self.density.set(p["density"])
         if "approach" in p: self.approach.set(p["approach"])
+        if "enclose" in p: self.enclose.set(p["enclose"])
+        self.bebop.set(bool(p.get("bebop", False)))   # vždy nastav (lekce bez bebopu = vypnuto)
         if "color" in p: self.color.set(p["color"])
         if p.get("voicing") in voi.LABELS: self.voicing.set(voi.LABELS[p["voicing"]])
         if "root" in p: self.root_note.set(p["root"])
@@ -216,16 +225,19 @@ class App:
         """Vygeneruj s případnými přepisy parametrů (pro A/B) -> (H, landings, line, density)."""
         density = int(over.get("density", self.density.get()))
         approach = float(over.get("approach", self.approach.get()))
+        enclose = float(over.get("enclose", self.enclose.get()))
+        bebop = bool(over.get("bebop", self.bebop.get()))
         color = over.get("color", self.color.get())
         kind = over.get("voicing", self._kind())
-        H = Harmony(self.chords.get(), color=color, voicing=kind)
-        line = build.generate(H, density=density, seed=self.seed.get(), approach=approach)
+        H = Harmony(self.chords.get(), color=color, voicing=kind, bebop=bebop)
+        line = build.generate(H, density=density, seed=self.seed.get(), approach=approach,
+                              enclose=enclose)
         _, landings = build.guide_path(H)
         return H, landings, line, density
 
     # ---------- serializace nastavení do JSON (jako prototyp) ----------
     PERSIST = ["lesson", "root_note", "mode", "pattern", "chords", "density", "approach",
-               "color", "bpm", "seed", "voicing", "port", "flip"]
+               "enclose", "bebop", "color", "bpm", "seed", "voicing", "port", "flip"]
 
     def _state_dict(self):
         return {k: getattr(self, k).get() for k in self.PERSIST if hasattr(self, k)}
@@ -254,8 +266,8 @@ class App:
                         pass
             setv("root_note"); setv("mode")
             self._refresh_patterns()                  # nabídka postupů dle načtené tonality
-            for k in ("pattern", "chords", "density", "approach", "color", "bpm",
-                      "seed", "voicing", "port", "flip", "lesson"):
+            for k in ("pattern", "chords", "density", "approach", "enclose", "bebop",
+                      "color", "bpm", "seed", "voicing", "port", "flip", "lesson"):
                 setv(k)
             if "lesson" in d:
                 les = lessons.by_title(self.lesson.get())

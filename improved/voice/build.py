@@ -36,6 +36,12 @@ def _approach(target, frm, scale, rng, chrom=0.7):
     return scale[j]
 
 
+def _enc_upper(scale, target):
+    """Horní obklíčení: nejbližší tón stupnice STRIKTNĚ nad cílem (fallback +2)."""
+    above = [s for s in scale if s > target]
+    return min(above) if above else target + 2
+
+
 def _scale_between(scale, a, b, frac):
     """Tón stupnice mezi a a b v poměru frac (krokové vyplnění)."""
     ia = min(range(len(scale)), key=lambda k: abs(scale[k] - a))
@@ -56,12 +62,14 @@ def guide_path(harmony):
     return entries, landings
 
 
-def generate(harmony, density=2, seed=1, approach=0.5, taste=None):
+def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, taste=None):
     """harmony = Harmony, density = not/dobu. Vrať [(onset, délka, MIDI)].
     DRILL se zaměřením na LANDING tóny: 1. doba = guide tón (voice-led), pak akordové
     arpeggio v JEDNOM směru přes takt (takty střídají klesající/stoupající -> jasný
     tvar, žádné bloudění), offbeaty = stupnicové spojení, poslední offbeat = approach
     do dalšího akordu. approach = jak často je to chromatický náběh (0..1).
+    enclose = pravděpodobnost OBKLÍČENÍ cíle (horní soused stupnice + spodní půltón ->
+    cíl); aktivní jen při density >= 3 (potřebuje 2 sloty před cílem).
     taste = volitelný (Evans) model; None = čistě teoretický drill."""
     rng = random.Random(seed)
     npb = density * BEATS
@@ -89,16 +97,26 @@ def generate(harmony, density=2, seed=1, approach=0.5, taste=None):
                 d = -d; ni = ci + d
             ni = max(0, min(len(ct) - 1, ni))
             targets.append(ct[ni]); ci = ni
-        # POZICE: arpeggio na doby; offbeaty stupnicově spojí / approachnou na další cíl
+        # POZICE: arpeggio na doby; offbeaty stupnicově spojí / approachnou / OBKLÍČÍ další cíl
         pos = {b * density: targets[b] for b in range(BEATS)}
+        last_enc = False
         for b in range(BEATS):
             a = targets[b]
             bnext = targets[b + 1] if b + 1 < BEATS else nxt_entry
+            enc = density >= 3 and rng.random() < enclose      # obklíčení cíle bnext (2 sloty před ním)
+            if b == BEATS - 1:
+                last_enc = enc
             for j in range(1, density):
-                p = (_approach(bnext, a, sc, rng, approach) if j == density - 1
-                     else _scale_between(sc, a, bnext, j / density))
-                pos[b * density + j] = p
-        if npb >= 2:
+                slot = b * density + j
+                if enc and j == density - 2:                   # horní soused stupnice
+                    pos[slot] = _enc_upper(sc, bnext)
+                elif enc and j == density - 1:                 # spodní půltón (chromaticky) -> cíl
+                    pos[slot] = bnext - 1
+                elif j == density - 1:                          # jednoduchý approach na cíl
+                    pos[slot] = _approach(bnext, a, sc, rng, approach)
+                else:                                           # stupnicové vyplnění
+                    pos[slot] = _scale_between(sc, a, bnext, j / density)
+        if npb >= 2 and not last_enc:
             pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, targets[-1]), sc, rng, approach)
         prev = None
         for n in range(npb):

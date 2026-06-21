@@ -32,7 +32,11 @@ SCALES = {
     "mel_minor": [0, 2, 3, 5, 7, 9, 11], "harm_minor": [0, 2, 3, 5, 7, 8, 11],
     "dim_wh": [0, 2, 3, 5, 6, 8, 9, 11], "dim_hw": [0, 1, 3, 4, 6, 7, 9, 10],
     "bebop_dom": [0, 2, 4, 5, 7, 9, 10, 11], "bebop_maj": [0, 2, 4, 5, 7, 8, 9, 11],
+    "bebop_dorian": [0, 2, 3, 5, 7, 9, 10, 11],   # dórská + velká septima (průchod b7->1)
 }
+# bebopová varianta chord-scale dle kvality (přidaný chromatický PRŮCHOD -> akord. tóny na těžkou)
+BEBOP = {"maj7": "bebop_maj", "6": "bebop_maj", "7": "bebop_dom",
+         "m7": "bebop_dorian", "m6": "bebop_dorian"}
 
 # vestavěné šablony progresí (changes = funkční data; dur i moll)
 TEMPLATES = {
@@ -87,8 +91,9 @@ class Harmony:
     """Progrese (string/[(root,q)]) -> [Bar]. Chord-scale dle FUNKCE (kontextově,
     z následujícího akordu). color = 'inside' | 'outside' (napětí dominant->moll)."""
     def __init__(self, progression, lo=55, hi=88, center=None, color="inside",
-                 voicing="rootless"):
+                 voicing="rootless", bebop=False):
         # center = referenční rejstřík MELODIE; voicing = TYP rozložení LH (viz voicings).
+        # bebop = použij bebopovou (8-tónovou) chord-scale -> průchod drží akord. tóny na těžké.
         self.lo, self.hi = lo, hi
         self.center = center if center is not None else (lo + hi) // 2
         self.color = color
@@ -98,7 +103,7 @@ class Harmony:
         for i, (root, q) in enumerate(prog):
             nr, nq = prog[(i + 1) % len(prog)]
             to_minor = (q == "7" and nr == (root + 5) % 12 and nq in ("m7", "m6", "mmaj7", "m7b5"))
-            name = scale_name_for(q, to_minor, color)
+            name = BEBOP[q] if (bebop and q in BEBOP) else scale_name_for(q, to_minor, color)
             scale = _pitches(SCALES[name], root, lo, hi)
             chord_tones = _pitches(CHORD_TONES.get(q, [0, 4, 7, 10]), root, lo, hi)
             guides = _pitches([CHORD_TONES.get(q, [0, 4, 7, 10])[k] for k in (1, 3)], root, lo, hi)

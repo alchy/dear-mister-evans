@@ -68,15 +68,36 @@ LESSONS = [
         "title": "6 · Approach tóny (chromatika)",
         "explain": ("Půltónový PŘÍCHOD ze sousedního tónu na cíl dodá bebopový spád — fialová "
                     "kolečka jsou chromatika (jen na slabých dobách). A/B: bez (A) a s approach (B)."),
-        "preset": {"density": 2, "approach": 0.85, "voicing": "rootless",
+        "preset": {"density": 2, "approach": 0.85, "enclose": 0.0, "voicing": "rootless",
                    "root": "C", "mode": "dur", "pattern": "ii–V–I"},
         "focus": "approach",
         "ab": {"A": {"approach": 0.0}, "B": {"approach": 0.85}},
     },
+    {
+        "key": "enclosure",
+        "title": "7 · Enclosure (obklíčení)",
+        "explain": ("Cíl OBKLÍČÍŠ ze dvou stran těsně před dosednutím: horní soused ze stupnice, "
+                    "pak spodní půltón (fialově), pak cíl. Silný bebopový spád. A/B: bez a s obklíčením. "
+                    "(Potřebuje hustotu 3.)"),
+        "preset": {"density": 3, "approach": 0.3, "enclose": 0.85, "voicing": "rootless",
+                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "focus": "approach",
+        "ab": {"A": {"enclose": 0.0}, "B": {"enclose": 0.9}},
+    },
+    {
+        "key": "bebop_scale",
+        "title": "8 · Bebop stupnice",
+        "explain": ("Přidaný chromatický PRŮCHOD (8-tónová stupnice) zařídí, že akordové tóny "
+                    "padnou na TĚŽKOU dobu při plynulém běhu. Paleta ukáže 8 tónů. A/B: běžná vs bebop."),
+        "preset": {"density": 2, "approach": 0.2, "enclose": 0.0, "bebop": True, "voicing": "rootless",
+                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "focus": "scale",
+        "ab": {"A": {"bebop": False}, "B": {"bebop": True}},
+    },
     # --- Blok D: levá ruka ---
     {
         "key": "voice_leading",
-        "title": "7 · Vedení levé ruky",
+        "title": "9 · Vedení levé ruky",
         "explain": ("Mezi akordy přesouvej levou ruku CO NEJMÍŇ — guide tóny vedeš půltónem, "
                     "společné tóny držíš. Modré čáry = pohyb hlasů. A/B: základní tvar vs rootless."),
         "preset": {"density": 2, "approach": 0.4, "voicing": "rootless",
@@ -86,7 +107,7 @@ LESSONS = [
     },
     {
         "key": "voicing_textures",
-        "title": "8 · Voicing textury (LH)",
+        "title": "10 · Voicing textury (LH)",
         "explain": ("Stejné tóny, jiná hustota a barva: rootless (Evans), drop2 (otevřený), "
                     "cluster (těsný). A/B: rootless vs stupnicový cluster — slyš rozdíl textury."),
         "preset": {"density": 2, "approach": 0.4, "voicing": "rootless",
@@ -97,7 +118,7 @@ LESSONS = [
     # --- Blok E: moll ---
     {
         "key": "minor_ii_v_i",
-        "title": "9 · Mollové ii–V–i",
+        "title": "11 · Mollové ii–V–i",
         "explain": ("V moll je ii půlzmenšený (iiø, lokrická ♮2) a V míří do i. Inside = frygická "
                     "dominanta (klidnější), outside = altered (♭9 ♯9 ♭13, napětí). A/B: inside vs outside."),
         "preset": {"density": 2, "approach": 0.6, "color": "inside", "voicing": "rootless",
