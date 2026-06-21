@@ -217,7 +217,7 @@ BLOCKS = [
     ("E · Moll", ["minor_ii_v_i"]),
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
-    ("H · Běhy / licky", ["thirds_run"]),
+    ("H · Běhy / licky", ["thirds_run", "thirds_run_up"]),
 ]
 
 
