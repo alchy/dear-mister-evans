@@ -44,10 +44,13 @@ def _scale_between(scale, a, b, frac):
     return scale[max(0, min(len(scale) - 1, j))]
 
 
-def generate(harmony, density=2, seed=1, approach=0.7, taste=None):
+def generate(harmony, density=2, seed=1, approach=0.5, taste=None):
     """harmony = Harmony, density = not/dobu. Vrať [(onset, délka, MIDI)].
-    approach = jak často offbeat před cílem chromaticky obkličuje (0..1).
-    taste = volitelný (Evans) model; None = čistě teoretický builder."""
+    DRILL se zaměřením na LANDING tóny: 1. doba = guide tón (voice-led), pak akordové
+    arpeggio v JEDNOM směru přes takt (takty střídají klesající/stoupající -> jasný
+    tvar, žádné bloudění), offbeaty = stupnicové spojení, poslední offbeat = approach
+    do dalšího akordu. approach = jak často je to chromatický náběh (0..1).
+    taste = volitelný (Evans) model; None = čistě teoretický drill."""
     rng = random.Random(seed)
     npb = density * BEATS
     bars = harmony.bars
@@ -55,21 +58,27 @@ def generate(harmony, density=2, seed=1, approach=0.7, taste=None):
     prev_exit = harmony.center
     for i, bar in enumerate(bars):
         sc = bar.scale
+        ct = bar.chord_tones or sc                           # arpeggiujeme akordové tóny
         nxt = bars[(i + 1) % len(bars)]
-        entry = _nearest(bar.guides or sc, prev_exit)        # 1. doba = guide tón, voice-led
+        entry = _nearest(bar.guides or ct, prev_exit)        # 1. doba = guide tón, voice-led
         nxt_entry = _nearest(nxt.guides or nxt.scale, entry)
-        # CÍLE na doby: beat0 = entry guide tón; další = akord. tóny po kontuře
-        targets = [entry]
-        cur = entry; d = 1 if i % 2 == 0 else -1
+        # SMĚR: střídej takt po taktu (klesat/stoupat); na kraji rejstříku obrať dovnitř
+        d = -1 if i % 2 == 0 else 1
+        if entry <= harmony.lo + 7:
+            d = 1
+        elif entry >= harmony.hi - 7:
+            d = -1
+        # CÍLE na doby = akordové arpeggio v jednom směru (odraz od kraje, bez duplikace)
+        ci = min(range(len(ct)), key=lambda k: abs(ct[k] - entry))
+        targets = [ct[ci]]
         for b in range(1, BEATS):
-            t = _next_chord_tone(bar.chord_tones, cur, d, rng)
-            targets.append(t); cur = t
-            if rng.random() < 0.4:
-                d = -d                                       # měň konturu
-        # POZICE: cíl na každou dobu; offbeaty = spojky
-        pos = {}
-        for b in range(BEATS):
-            pos[b * density] = targets[b]
+            ni = ci + d
+            if ni < 0 or ni >= len(ct):                       # odraz dovnitř rejstříku
+                d = -d; ni = ci + d
+            ni = max(0, min(len(ct) - 1, ni))
+            targets.append(ct[ni]); ci = ni
+        # POZICE: arpeggio na doby; offbeaty stupnicově spojí / approachnou na další cíl
+        pos = {b * density: targets[b] for b in range(BEATS)}
         for b in range(BEATS):
             a = targets[b]
             bnext = targets[b + 1] if b + 1 < BEATS else nxt_entry
@@ -77,11 +86,16 @@ def generate(harmony, density=2, seed=1, approach=0.7, taste=None):
                 p = (_approach(bnext, a, sc, rng, approach) if j == density - 1
                      else _scale_between(sc, a, bnext, j / density))
                 pos[b * density + j] = p
-        if npb >= 2:                                          # poslední offbeat -> approach do dalšího taktu
+        if npb >= 2:
             pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, targets[-1]), sc, rng, approach)
+        prev = None
         for n in range(npb):
-            line.append((i * BPC + n / density, (1.0 / density) * 0.9, pos.get(n, targets[0])))
-        prev_exit = pos.get(npb - 1, targets[-1])
+            p = pos.get(n, targets[0])
+            if p == prev:                                     # nikdy neopakuj tentýž tón
+                p += (1 if d > 0 else -1)
+            line.append((i * BPC + n / density, (1.0 / density) * 0.9, p))
+            prev = p
+        prev_exit = prev
     return line
 
 
