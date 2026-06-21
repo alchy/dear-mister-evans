@@ -205,6 +205,18 @@ LESSONS = [
         "motion": "thirds_up",
         "ab": {"A": {"motion": "scale"}, "B": {"motion": "thirds_up"}},
     },
+    {
+        "key": "fourths_run",
+        "title": "18 · Kvartové běhy (run)",
+        "explain": ("Kvartová (quartal) melodika: tóny po KVARTÁCH (3 stupnicové kroky) ve "
+                    "4-tónových buňkách — modální, McCoy Tyner / Coltrane zvuk. Tónina i postup "
+                    "jsou volné. A/B: dolů (A) vs nahoru (B)."),
+        "preset": {"density": 1, "approach": 0.0, "voicing": "rootless",
+                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "focus": "scale",
+        "motion": "fourths_up",
+        "ab": {"A": {"motion": "fourths_down"}, "B": {"motion": "fourths_up"}},
+    },
 ]
 
 
@@ -217,7 +229,7 @@ BLOCKS = [
     ("E · Moll", ["minor_ii_v_i"]),
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
-    ("H · Běhy / licky", ["thirds_run", "thirds_run_up"]),
+    ("H · Běhy / licky", ["thirds_run", "thirds_run_up", "fourths_run"]),
 ]
 
 
