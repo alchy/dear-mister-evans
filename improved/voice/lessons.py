@@ -154,6 +154,19 @@ LESSONS = [
         "motion": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "wt"}},
     },
+    # --- Blok G: blues / pentatonika ---
+    {
+        "key": "blues_pent",
+        "title": "14 · Blues / pentatonika",
+        "explain": ("Jedna stupnice přes CELÉ změny: mollová pentatonika (1 ♭3 4 5 ♭7) + blue "
+                    "note (♭5) = bluesová stupnice. Funguje nad celým blues, není nutné měnit "
+                    "stupnici po akordech. A/B: pentatonika (A) vs blues s ♭5 (B) — slyš blue note."),
+        "preset": {"density": 2, "approach": 0.2, "voicing": "rootless", "scale": "blues",
+                   "chords": "C7 F7 C7 C7 F7 F7 C7 C7 G7 F7 C7 G7"},
+        "focus": "scale",
+        "motion": "scale",
+        "ab": {"A": {"scale": "min_pent"}, "B": {"scale": "blues"}},
+    },
 ]
 
 
@@ -165,6 +178,7 @@ BLOCKS = [
     ("D · Levá ruka", ["voice_leading", "voicing_textures"]),
     ("E · Moll", ["minor_ii_v_i"]),
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom"]),
+    ("G · Blues / pentatonika", ["blues_pent"]),
 ]
 
 
