@@ -103,13 +103,19 @@ def _sym(bar):
     return _PC[bar.root % 12] + bar.quality
 
 
-def draw(cv, harmony, landings, line=None, width=None):
+def draw(cv, harmony, landings, line=None, width=None, flip=False):
     cv.delete("all")
     g = _geom(width if width is not None else cv.winfo_width())
     bars = harmony.bars
-    mel = _by_bar(line, len(bars)) if line else None
+    n = len(bars)
+    mel = _by_bar(line, n) if line else None
+
+    def y0_of(i):                                             # vrch řádku datového akordu i
+        s = (n - 1 - i) if flip else i                        # flip = zdola nahoru
+        return PAD + s * g.ROW_H
+
     for i, bar in enumerate(bars):
-        y0 = PAD + i * g.ROW_H
+        y0 = y0_of(i)
         ky = y0 + g.LBL
         cv.create_text(2, y0, anchor="nw", text=f"{_sym(bar)}  ·  {bar.scale_name}",
                        font=("Segoe UI", g.flbl, "bold"), fill="#234")
@@ -125,10 +131,11 @@ def draw(cv, harmony, landings, line=None, width=None):
                      outline="#2a9d3a", width=2, fill="")
         cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
-    # 1) čáry voice-leadingu mezi sousedními voicingy (levá ruka)
-    for i in range(len(bars) - 1):
-        yb = PAD + i * g.ROW_H + g.LBL + g.WH
-        yt = PAD + (i + 1) * g.ROW_H + g.LBL
+    # 1) čáry voice-leadingu mezi sousedními voicingy (dle skutečných slotů)
+    for i in range(n - 1):
+        kyi = y0_of(i) + g.LBL
+        kyj = y0_of(i + 1) + g.LBL
+        yb, yt = (kyi + g.WH, kyj) if kyj > kyi else (kyi, kyj + g.WH)   # hrana blíž sousedovi
         a = sorted([bars[i].bass] + list(bars[i].voicing))
         b = sorted([bars[i + 1].bass] + list(bars[i + 1].voicing))
         for ma, mb in zip(a, b):
@@ -136,20 +143,41 @@ def draw(cv, harmony, landings, line=None, width=None):
                            _cx(g, 0, BASS_LO, BASS_HI, mb), yt, fill=VL_LINE, width=1)
     # číslovaná kolečka navrch
     for i, bar in enumerate(bars):
-        ky = PAD + i * g.ROW_H + g.LBL
+        ky = y0_of(i) + g.LBL
         _seq(cv, g, 0, ky, BASS_LO, BASS_HI, [bar.bass] + sorted(bar.voicing), DOT_BASS)
         if mel:
             _seq(cv, g, g.mel_x0, ky, MEL_LO, MEL_HI, mel[i], DOT_MEL)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
-    cv.config(scrollregion=(0, 0, total_w, PAD + len(bars) * g.ROW_H + 6))
+    cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
 
 
-def set_playing(cv, row, n_bars, width=None):
-    """Zelená linka pod právě hraným řádkem. row=None zhasne."""
+def set_playing(cv, row, n_bars, width=None, flip=False):
+    """Zelená linka pod právě hraným řádkem (respektuje flip). row=None zhasne."""
     cv.delete("playline")
     if row is None or not (0 <= row < n_bars):
         return
     g = _geom(width if width is not None else cv.winfo_width())
-    y = PAD + row * g.ROW_H + g.LBL + g.WH + 2
+    s = (n_bars - 1 - row) if flip else row
+    y = PAD + s * g.ROW_H + g.LBL + g.WH + 2
     x1 = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW
     cv.create_line(0, y, x1, y, fill="#10c040", width=3, tags="playline")
+
+
+def hit(cv, x, y, n_bars, width=None, flip=False):
+    """Klik (canvas coords) -> (data_row, side) kde side='chord' (levá klávesnice)
+    nebo 'line' (pravá). Mimo klávesy vrátí None. Respektuje flip."""
+    g = _geom(width if width is not None else cv.winfo_width())
+    slot = int((y - PAD) // g.ROW_H)
+    if not (0 <= slot < n_bars):
+        return None
+    ky = PAD + slot * g.ROW_H + g.LBL
+    if not (ky <= y <= ky + g.WH):
+        return None
+    row = (n_bars - 1 - slot) if flip else slot
+    bass_w = whites(BASS_LO, BASS_HI + 1) * g.WW
+    mel_w = whites(MEL_LO, MEL_HI + 1) * g.WW
+    if x <= bass_w:
+        return (row, "chord")
+    if g.mel_x0 <= x <= g.mel_x0 + mel_w:
+        return (row, "line")
+    return None

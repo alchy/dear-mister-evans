@@ -115,9 +115,13 @@ class App:
         ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=2)
         ttk.Button(btns, text="🎲", width=3, command=self.on_reseed).pack(side="left", padx=2)
 
-        self.status = tk.StringVar(value="Připraveno. (stavebnice cíl+spojka)")
+        self.flip = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
+                        command=self._redraw).grid(row=3, column=0, sticky="w", pady=(6, 0))
+
+        self.status = tk.StringVar(value="Připraveno. (klik na klávesy = přehraj: vlevo akord, vpravo linka)")
         ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
-                  wraplength=300).grid(row=3, column=0, sticky="we", pady=(8, 0))
+                  wraplength=300).grid(row=4, column=0, sticky="we", pady=(6, 0))
 
     def _preview(self, f):
         self.canvas = tk.Canvas(f, width=820, height=680, bg="#fafafa", highlightthickness=0)
@@ -125,7 +129,9 @@ class App:
         self.canvas.configure(yscrollcommand=sb.set)
         self.canvas.grid(row=0, column=0, sticky="nsew")
         sb.grid(row=0, column=1, sticky="ns")
+        self.canvas.configure(cursor="hand2")
         self.canvas.bind("<Configure>", self._on_canvas_resize)
+        self.canvas.bind("<Button-1>", self.on_kbd_click)    # klik na klávesy = přehraj blok
 
     def _on_mode(self):
         pats = prog.patterns(self.mode.get())                 # přepiš nabídku postupů dle tonality
@@ -154,7 +160,59 @@ class App:
         self._resize_job = None
         if self._draw_state:
             H, land, line = self._draw_state
-            view.draw(self.canvas, H, land, line, width=self.canvas.winfo_width())
+            view.draw(self.canvas, H, land, line, width=self.canvas.winfo_width(),
+                      flip=self.flip.get())
+
+    # ---- klik na klaviaturu = přehraj zobrazený blok (vlevo akord, vpravo linka) ----
+    def on_kbd_click(self, event):
+        if self._draw_state is None or (self.worker and self.worker.is_alive()):
+            return
+        H, land, line = self._draw_state
+        x = self.canvas.canvasx(event.x); y = self.canvas.canvasy(event.y)
+        h = view.hit(self.canvas, x, y, len(H), width=self.canvas.winfo_width(), flip=self.flip.get())
+        if not h:
+            return
+        row, side = h
+        bar = H.bars[row]
+        if side == "chord":
+            self._play_block("chord", [bar.bass] + list(bar.voicing), f"akord {view._sym(bar)}")
+        else:
+            mel = view._by_bar(line, len(H))[row] if line else []
+            self._play_block("line", mel, f"linka {view._sym(bar)}")
+
+    def _play_block(self, kind, notes, what):
+        notes = [int(n) for n in notes if n]
+        if not notes:
+            return
+        self.stop.clear()
+        name = self.port.get()
+        if not name:
+            self.status.set("Není vybraný MIDI port."); return
+        bpm = max(1, self.bpm.get())
+
+        def run():
+            import time
+            try:
+                self.status.set(f"Hraji {what}…")
+                with mido.open_output(name) as out:
+                    if kind == "chord":
+                        for nn in notes:
+                            out.send(mido.Message("note_on", note=nn, velocity=76))
+                        time.sleep(1.6)
+                        for nn in notes:
+                            out.send(mido.Message("note_off", note=nn, velocity=0))
+                    else:
+                        d = 60.0 / bpm / 2
+                        for nn in notes:
+                            if self.stop.is_set():
+                                break
+                            out.send(mido.Message("note_on", note=nn, velocity=92)); time.sleep(d * 0.9)
+                            out.send(mido.Message("note_off", note=nn, velocity=0)); time.sleep(d * 0.1)
+                if not self.stop.is_set():
+                    self.status.set(f"Hotovo ({what}).")
+            except Exception as e:
+                traceback.print_exc(); self.status.set(f"Chyba: {e}")
+        self.worker = threading.Thread(target=run, daemon=True); self.worker.start()
 
     def refresh_ports(self):
         names = mido.get_output_names() or [""]
@@ -216,7 +274,8 @@ class App:
                 bar = int(t / bar_s)
                 if bar != cur and 0 <= bar < n_bars:
                     cur = bar
-                    self.root.after(0, lambda b=bar: view.set_playing(self.canvas, b, n_bars))
+                    self.root.after(0, lambda b=bar: view.set_playing(
+                        self.canvas, b, n_bars, flip=self.flip.get()))
                 out.send(msg)
             for ch in range(16):
                 out.send(mido.Message("control_change", channel=ch, control=123, value=0))
