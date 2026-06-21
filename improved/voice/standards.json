@@ -1,31 +1,165 @@
 {
   "_comment": "Jazzové standardy k procvičení nad reálnými změnami. Rozšiřuj přidáním položek: name (název), key (tónina, info), changes (akordy oddělené mezerou, 1 akord = 1 takt). Kvality: maj7 m7 7 6 m6 m7b5 dim7 mmaj7.",
   "standards": [
-    { "name": "Autumn Leaves (A)", "key": "Gm",
-      "changes": "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7" },
-    { "name": "Blue Bossa", "key": "Cm",
-      "changes": "Cm7 Cm7 Fm7 Fm7 Dm7b5 G7 Cm7 Cm7 Ebm7 Ab7 Dbmaj7 Dbmaj7 Dm7b5 G7 Cm7 Cm7" },
-    { "name": "Take the A Train (A)", "key": "C",
-      "changes": "Cmaj7 Cmaj7 D7 D7 Dm7 G7 Cmaj7 Cmaj7" },
-    { "name": "Tune Up", "key": "D",
-      "changes": "Em7 A7 Dmaj7 Dmaj7 Dm7 G7 Cmaj7 Cmaj7 Cm7 F7 Bbmaj7 Bbmaj7" },
-    { "name": "Lady Bird", "key": "C",
-      "changes": "Cmaj7 Cmaj7 Fm7 Bb7 Cmaj7 Cmaj7 Bbm7 Eb7 Abmaj7 Abmaj7 Am7 D7 Dm7 G7 Cmaj7 Cmaj7" },
-    { "name": "All of Me (A)", "key": "C",
-      "changes": "Cmaj7 Cmaj7 E7 E7 A7 A7 Dm7 Dm7 E7 E7 Am7 Am7 D7 D7 Dm7 G7" },
-    { "name": "Fly Me to the Moon", "key": "C",
-      "changes": "Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Am7" },
-    { "name": "So What (modal)", "key": "Dm",
-      "changes": "Dm7 Dm7 Dm7 Dm7 Ebm7 Ebm7 Dm7 Dm7" },
-    { "name": "There Will Never Be Another You (A)", "key": "Eb",
-      "changes": "Ebmaj7 Ebmaj7 Dm7b5 G7 Cm7 Cm7 Bbm7 Eb7 Abmaj7 Abmaj7 Abm7 Db7 Ebmaj7 Cm7 F7 F7" },
-    { "name": "Stella by Starlight", "key": "Bb",
-      "changes": "Em7b5 A7 Cm7 F7 Fm7 Bb7 Ebmaj7 Ab7 Bbmaj7 Em7b5 A7 Dm7 Bbm7 Eb7 Fmaj7 Em7b5 A7 Am7b5 D7 G7 G7 Cm7 Cm7 Ab7 Ab7 Bbmaj7 Bbmaj7 Em7b5 A7 Dm7b5 G7 Cm7b5 F7 Bbmaj7 Bbmaj7" },
-    { "name": "My Favorite Things", "key": "Em",
-      "changes": "Em7 Em7 Em7 Em7 Emaj7 Emaj7 Emaj7 Emaj7 Cmaj7 Cmaj7 F#m7b5 B7 Em7 Em7 Em7 Em7" },
-    { "name": "Days of Wine and Roses", "key": "F",
-      "changes": "Fmaj7 Eb7 Am7 D7 Gm7 Gm7 Bbm7 Eb7 Am7 D7 Gm7 C7 Fmaj7 Dm7 Gm7 C7" },
-    { "name": "Beautiful Love", "key": "Dm",
-      "changes": "Em7b5 A7 Dm7 Dm7 Gm7 C7 Fmaj7 Bb7 Em7b5 A7 Dm7 Dm7 Gm7 Gm7 Em7b5 A7" }
+    {
+      "name": "Autumn Leaves (A)",
+      "key": "Gm",
+      "changes": "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7"
+    },
+    {
+      "name": "Blue Bossa",
+      "key": "Cm",
+      "changes": "Cm7 Cm7 Fm7 Fm7 Dm7b5 G7 Cm7 Cm7 Ebm7 Ab7 Dbmaj7 Dbmaj7 Dm7b5 G7 Cm7 Cm7"
+    },
+    {
+      "name": "Take the A Train (A)",
+      "key": "C",
+      "changes": "Cmaj7 Cmaj7 D7 D7 Dm7 G7 Cmaj7 Cmaj7"
+    },
+    {
+      "name": "Tune Up",
+      "key": "D",
+      "changes": "Em7 A7 Dmaj7 Dmaj7 Dm7 G7 Cmaj7 Cmaj7 Cm7 F7 Bbmaj7 Bbmaj7"
+    },
+    {
+      "name": "Lady Bird",
+      "key": "C",
+      "changes": "Cmaj7 Cmaj7 Fm7 Bb7 Cmaj7 Cmaj7 Bbm7 Eb7 Abmaj7 Abmaj7 Am7 D7 Dm7 G7 Cmaj7 Cmaj7"
+    },
+    {
+      "name": "All of Me (A)",
+      "key": "C",
+      "changes": "Cmaj7 Cmaj7 E7 E7 A7 A7 Dm7 Dm7 E7 E7 Am7 Am7 D7 D7 Dm7 G7"
+    },
+    {
+      "name": "Fly Me to the Moon",
+      "key": "C",
+      "changes": "Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Am7"
+    },
+    {
+      "name": "So What (modal)",
+      "key": "Dm",
+      "changes": "Dm7 Dm7 Dm7 Dm7 Ebm7 Ebm7 Dm7 Dm7"
+    },
+    {
+      "name": "There Will Never Be Another You (A)",
+      "key": "Eb",
+      "changes": "Ebmaj7 Ebmaj7 Dm7b5 G7 Cm7 Cm7 Bbm7 Eb7 Abmaj7 Abmaj7 Abm7 Db7 Ebmaj7 Cm7 F7 F7"
+    },
+    {
+      "name": "Stella by Starlight",
+      "key": "Bb",
+      "changes": "Em7b5 A7 Cm7 F7 Fm7 Bb7 Ebmaj7 Ab7 Bbmaj7 Em7b5 A7 Dm7 Bbm7 Eb7 Fmaj7 Em7b5 A7 Am7b5 D7 G7 G7 Cm7 Cm7 Ab7 Ab7 Bbmaj7 Bbmaj7 Em7b5 A7 Dm7b5 G7 Cm7b5 F7 Bbmaj7 Bbmaj7"
+    },
+    {
+      "name": "My Favorite Things",
+      "key": "Em",
+      "changes": "Em7 Em7 Em7 Em7 Emaj7 Emaj7 Emaj7 Emaj7 Cmaj7 Cmaj7 F#m7b5 B7 Em7 Em7 Em7 Em7"
+    },
+    {
+      "name": "Days of Wine and Roses",
+      "key": "F",
+      "changes": "Fmaj7 Eb7 Am7 D7 Gm7 Gm7 Bbm7 Eb7 Am7 D7 Gm7 C7 Fmaj7 Dm7 Gm7 C7"
+    },
+    {
+      "name": "Beautiful Love",
+      "key": "Dm",
+      "changes": "Em7b5 A7 Dm7 Dm7 Gm7 C7 Fmaj7 Bb7 Em7b5 A7 Dm7 Dm7 Gm7 Gm7 Em7b5 A7"
+    },
+    {
+      "name": "Everything Happens to Me (A)",
+      "key": "C",
+      "changes": "Dm7 G7 Em7 F#dim7 Dm7 G7 C6 A7 Em7 A7 Dm7 G7 Cmaj7 A7 Dm7 G7"
+    },
+    {
+      "name": "Corcovado",
+      "key": "C",
+      "changes": "Dm7 Abdim7 Gm7 C7 Fmaj7 Fdim7 Fm7 Bb7 Em7 A7 D7 Dm7 Abdim7 Gm7 C7 Fmaj7 Fdim7 Fm7 Bb7 Em7 A7 Dm7 G7 Em7 A7 Dm7 G7 Em7b5 A7 Dm7 G7 C6"
+    },
+    {
+      "name": "A Time for Love (A)",
+      "key": "C",
+      "changes": "Am7 E7 Am7 Fmaj7 Dm7 D7 Am7 Bm7b5 Cmaj7 Cdim7 Dm7 G7 D7 B7 Am7 E7"
+    },
+    {
+      "name": "Skylark",
+      "key": "Eb",
+      "changes": "Ebmaj7 Bb7 Ebmaj7 Eb7 Abmaj7 Db7 Ebmaj7 Cm7 Fm7 Bb7 Gm7 C7 Fm7 Bb7 Cm7 F7 Bbm7 Eb7 Abmaj7 Db7 Am7b5 D7 Gmaj7 Gm7b5 C7 Fm7 Bb7"
+    },
+    {
+      "name": "My Foolish Heart",
+      "key": "Bb",
+      "changes": "Bbmaj7 G7 Cm7 Em7 A7 Bbmaj7 D7 Gm7 Fm7 Ebmaj7 F7 Bbmaj7 Bb7 Eb6 Am7b5 D7 Gm7 Em7b5 A7 Dm7 G7 Cm7 F7 Bbmaj7 G7 Cm7 Em7 A7 Bbmaj7 D7 Gm7 Fm7 Ebmaj7 Am7b5 D7"
+    },
+    {
+      "name": "I Hear a Rhapsody",
+      "key": "Eb",
+      "changes": "Cmmaj7 Fm7 Bb7 Ebmaj7 Gm7b5 C7 Fm7b5 Bb7 Ebmaj7 Ebmaj7 G7 Cmmaj7 Fm7 Bb7 Ebmaj7 Gm7b5 C7 Fm7b5 Bb7 Ebmaj7 Am7b5 D7 Gm7 Am7b5 D7 Gm7 Cm7 F7 Bbmaj7 Dm7b5 Dm7b5 G7 G7 Cmmaj7 Fm7 Bb7 Ebmaj7 Gm7b5 C7 Fm7b5 Bb7 Ebmaj7 Ebmaj7"
+    },
+    {
+      "name": "Nardis",
+      "key": "Em",
+      "changes": "Em7 Fmaj7 B7 Cmaj7 Am7 Fmaj7 Emaj7 Em7 Em7 Fmaj7 B7 Cmaj7 Am7 Fmaj7 Emaj7 Em7 Am7 Fmaj7 Am7 Fmaj7 Dm7 G7 Cmaj7 Fmaj7 Em7 Fmaj7 B7 Cmaj7 Am7 Fmaj7 Emaj7 Em7"
+    },
+    {
+      "name": "Emily",
+      "key": "C",
+      "changes": "Cmaj7 Am7 Dm7 G7 Cmaj7 C7 Fmaj7 Fm7 Bb7 Amaj7 F#m7 Bm7 Bm7 E7 Am7 D7 Dm7 G7 Cmaj7 Am7 Dm7 G7 Cmaj7 Gm7 C7 Fmaj7 E7 Am7 B7 Em7 A7 Dm7 G7 Bb7 A7 F#m7b5 Fm7 Em7 A7 Dm7 G7 Cmaj7 Dm7 G7"
+    },
+    {
+      "name": "Young and Foolish",
+      "key": "C",
+      "changes": "Cmaj7 Dm7 G7 Cmaj7 Am7 Bbdim7 Fmaj7 A7 Dm7 A7 D7 G7 Cmaj7 B7 Am7 E7 Am7 D7 Dm7 G7 Cmaj7 Dm7 G7 Cmaj7 Am7 Bbdim7 Fmaj7 A7 Dm7 G7 Cmaj7 Cmaj7"
+    },
+    {
+      "name": "Invitation",
+      "key": "Cm",
+      "changes": "Cm7 Cm7 Db7 Db7 Cm7 Cm7 Bbm7 Bbm7 Am7 D7 Gmaj7 Bb7 Am7b5 D7 Gm7 C7 Cm7 Cm7 Db7 Db7 Cm7 Cm7 Bbm7 Bbm7 Am7 Am7 Gmaj7 Gmaj7 Dm7b5 G7 Cm7 Cm7"
+    },
+    {
+      "name": "Tenderly",
+      "key": "Eb",
+      "changes": "Ebmaj7 Bbm7 Eb7 Abmaj7 Ab7 Gm7 C7 Fm7 Bb7 Gm7b5 C7 Fm7 Bb7 Ebmaj7 Bb7 Ebmaj7 Bbm7 Eb7 Abmaj7 Ab7 Gm7 C7 Fm7 Bb7 Ebmaj7 Cm7 Fm7 Bb7 Ebmaj7 Bb7 Ebmaj7 Ebmaj7"
+    },
+    {
+      "name": "Darn That Dream",
+      "key": "G",
+      "changes": "Gmaj7 Bm7b5 E7 Am7 D7 Bm7 Bbdim7 Am7 Ab7 Gmaj7 Eb7 Am7 D7 Gmaj7 Am7 D7 Gmaj7 Bm7b5 E7 Am7 D7 Bm7 Bbdim7 Am7 Ab7 Gmaj7 D7 Em7 A7 Am7 D7 Gmaj7"
+    },
+    {
+      "name": "In Your Own Sweet Way",
+      "key": "Bb",
+      "changes": "Bbmaj7 Bbmaj7 Cm7 F7 Bbmaj7 Bb7 Ebmaj7 Ebm7 Ab7 Dm7 G7 Cm7 F7 Bbmaj7 Bbmaj7 Cm7 F7 Bbmaj7 Bb7 Ebmaj7 Ebm7 Ab7 Dm7 G7 Cm7 F7 Em7 A7 Dmaj7 Dmaj7 Am7 D7 Gmaj7 Gmaj7 Dm7 G7 Cmaj7 Ebm7 Ab7 Dm7 G7 Cm7 F7 Bbmaj7 Cm7 F7"
+    },
+    {
+      "name": "But Beautiful",
+      "key": "G",
+      "changes": "Gmaj7 Bm7b5 E7 Am7 C#m7b5 F#7 Bm7 E7 Am7 D7 Gmaj7 G7 Cmaj7 Cm7 F7 Bm7 E7 Am7 D7 Gmaj7 Bm7b5 E7 Am7 C#m7b5 F#7 Bm7 E7 Am7 D7 Gmaj7 Am7 D7"
+    },
+    {
+      "name": "How Deep Is the Ocean",
+      "key": "Eb",
+      "changes": "Fm7 Bb7 Eb6 Cm7 Fm7 Bb7 Eb6 G7 Cm7 F7 Fm7 Bb7 Ebmaj7 Eb7 Abmaj7 Gm7 Fm7 Bb7 Eb6 G7 Cm7 F7 Fm7 Bb7 Ebmaj7 Bb7 Eb6 C7 Fm7 Bb7 Eb6 Eb6"
+    },
+    {
+      "name": "You Must Believe in Spring",
+      "key": "Bm",
+      "changes": "Bm7 Bm7 Em7 A7 Dmaj7 G#m7b5 C#7 F#m7 Bm7b5 E7 Amaj7 Amaj7 Dm7 G7 Cmaj7 F#m7b5 B7 Em7 Am7 D7 Gmaj7 Em7b5 A7 Dmaj7"
+    },
+    {
+      "name": "Falling Grace",
+      "key": "Eb",
+      "changes": "Abmaj7 D7 Gm7 Fm7 Bb7 Eb6 D7 Gm7 C7 Fmaj7 F#m7b5 B7 Em7 Am7 D7 Gmaj7 Cm7 C#7 Bbmaj7 Ebmaj7 Em7b5 A7 Dm7 Db7 Cm7 F7 Bbmaj7 Ebmaj7 Amaj7 Dmaj7"
+    },
+    {
+      "name": "How My Heart Sings",
+      "key": "C",
+      "changes": "Cmaj7 Fmaj7 Bm7b5 E7 Em7 Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Am7 Abdim7 Am7 F#m7b5 Emaj7 G#m7 C#7 F#m7 B7 Dmaj7 Amaj7 Dmaj7 Amaj7 Cmaj7 Gmaj7 Cmaj7 B7"
+    },
+    {
+      "name": "Skating in Central Park",
+      "key": "C",
+      "changes": "Cmaj7 G7 Cmaj7 G7 Dm7 G7 Cmaj7 C7 Fmaj7 Bb7 Emaj7 Am7 Dm7 G7 Cmaj7 G7 C7 Fm7 Fm7 Fm7 Dm7b5 Ebmaj7 Ebmaj7 Ebmaj7 Ebmaj7 Am7 Am7 F#m7b5 Fm7 Dm7 G7"
+    }
   ]
 }

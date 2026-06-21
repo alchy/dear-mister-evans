@@ -126,9 +126,17 @@ class Harmony:
             self.bars.append(Bar(root, q, bass, sorted(voic), scale, name, chord_tones, guides))
 
     @staticmethod
+    def _normq(q):
+        """Sjednoť kvalitu z parseru na náš slovník (např. 'mMaj7' -> 'mmaj7')."""
+        if q in CHORD_TONES:
+            return q
+        return q.lower() if q.lower() in CHORD_TONES else q
+
+    @staticmethod
     def _parse(progression):
         if isinstance(progression, str):
-            return [parse_symbol(s) for s in progression.replace("|", " ").split()]
+            out = [parse_symbol(s) for s in progression.replace("|", " ").split()]
+            return [(r, Harmony._normq(q)) for r, q in out]
         return list(progression)
 
     def __len__(self):
