@@ -274,9 +274,10 @@ class App:
     def _register_traces(self):
         for k in self.PERSIST:
             if hasattr(self, k):
-                getattr(self, k).trace_add("write", lambda *_: self._schedule_save())
+                getattr(self, k).trace_add("write", lambda *_: self._schedule_change())
 
-    def _schedule_save(self):
+    def _schedule_change(self):
+        """Při změně nastavení: debounce -> ulož + OBNOV NÁHLED (general refresh)."""
         if self._loading:
             return
         if self._save_job:
@@ -284,7 +285,12 @@ class App:
                 self.root.after_cancel(self._save_job)
             except Exception:
                 pass
-        self._save_job = self.root.after(400, self._save_state)
+        self._save_job = self.root.after(250, self._on_change)
+
+    def _on_change(self):
+        self._save_job = None
+        self._save_state()
+        self._draw_only()                              # každá změna -> přegeneruj + překresli
 
     def _on_close(self):
         if self._save_job:                            # zruš čekající debounce save
