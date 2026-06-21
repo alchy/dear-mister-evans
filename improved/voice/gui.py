@@ -98,19 +98,22 @@ class App:
         # === Progrese (sdílený kontext cvičení) ===
         g = ttk.LabelFrame(f, text="Progrese", padding=6)
         g.grid(row=1, column=0, sticky="we", pady=(0, 8))
-        ttk.Label(g, text="Tónika:").grid(row=0, column=0, sticky="w", **pad)
+        lbl_root = ttk.Label(g, text="Tónika:"); lbl_root.grid(row=0, column=0, sticky="w", **pad)
         self.root_note = tk.StringVar(value="C")
-        ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES,
-                       command=lambda *_: self._rebuild()).grid(row=0, column=1, sticky="we", **pad)
-        ttk.Label(g, text="Tonalita:").grid(row=0, column=2, sticky="e", **pad)
+        m_root = ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES, command=lambda *_: self._rebuild())
+        m_root.grid(row=0, column=1, sticky="we", **pad)
+        lbl_mode = ttk.Label(g, text="Tonalita:"); lbl_mode.grid(row=0, column=2, sticky="e", **pad)
         self.mode = tk.StringVar(value="dur")
-        ttk.OptionMenu(g, self.mode, "dur", "dur", "moll",
-                       command=lambda *_: self._on_mode()).grid(row=0, column=3, sticky="we", **pad)
-        ttk.Label(g, text="Postup:").grid(row=1, column=0, sticky="w", **pad)
+        m_mode = ttk.OptionMenu(g, self.mode, "dur", "dur", "moll", command=lambda *_: self._on_mode())
+        m_mode.grid(row=0, column=3, sticky="we", **pad)
+        lbl_pat = ttk.Label(g, text="Postup:"); lbl_pat.grid(row=1, column=0, sticky="w", **pad)
         self.pattern = tk.StringVar(value=prog.patterns("dur")[0])
         self.pattern_menu = ttk.OptionMenu(g, self.pattern, self.pattern.get(), *prog.patterns("dur"),
                                            command=lambda *_: self._rebuild())
         self.pattern_menu.grid(row=1, column=1, columnspan=3, sticky="we", **pad)
+        # ovladače, které lekce může „zaghostit" (preset s pevnou progresí je nepotřebuje)
+        self._lockable = {"root": [lbl_root, m_root], "mode": [lbl_mode, m_mode],
+                          "pattern": [lbl_pat, self.pattern_menu]}
         ttk.Label(g, text="Vedení akordu (LH):").grid(row=2, column=0, sticky="w", **pad)
         self.voicing = tk.StringVar(value=voi.LABELS["rootless"])      # vždy volitelné (pilíř: akord v levé)
         ttk.OptionMenu(g, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
@@ -209,9 +212,22 @@ class App:
             self.chords.set(p["chords"])             # explicitní progrese (přebije stavebnici)
         else:
             self._rebuild()
+        self._set_locks(les, p)                       # zaghostí ovladače, co lekce nepotřebuje
         self.lesson_title.set(les["title"])
         self.explain.set(les["explain"])
         self.status.set(f"Lekce: {les['title']}")
+
+    def _set_locks(self, les, p):
+        """Zaghostí (disable) ovladače, které pro lekci nemá smysl měnit. Pevná progrese
+        (preset 'chords') -> Tónika/Tonalita/Postup jsou bez efektu. Lekce může navíc
+        vyjmenovat 'lock': [...] (root/mode/pattern)."""
+        locked = set(les.get("lock", []))
+        if "chords" in p:                                # explicitní progrese -> stavebnice bez efektu
+            locked |= {"root", "mode", "pattern"}
+        for name, widgets in self._lockable.items():
+            st = ["disabled"] if name in locked else ["!disabled"]
+            for w in widgets:
+                w.state(st)
 
     def on_ab(self):
         les = lessons.by_title(self.lesson.get())
@@ -296,6 +312,7 @@ class App:
                 self.explain.set(les["explain"])
                 self._focus = les.get("focus")
                 self._motion = les.get("motion", "arp")
+                self._set_locks(les, les.get("preset", {}))
             self.status.set("Obnoveno z minula.")
         finally:
             self._loading = False
