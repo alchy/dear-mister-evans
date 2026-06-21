@@ -179,6 +179,20 @@ LESSONS = [
         "motion": "scale",
         "ab": {"A": {"scale": "min_pent"}, "B": {"scale": "blues"}},
     },
+    # --- Blok H: běhy / licky ---
+    {
+        "key": "thirds_run",
+        "title": "16 · Sestupné tercie (run dolů)",
+        "explain": ("Restart VYSOKO u každého akordu a klesej po TERCIÍCH. Nad moll diatonické "
+                    "tercie (Am7: D B G E…), nad dominantou s whole-tone barvou augmentované "
+                    "tercie (D7: D A♯ F♯ = D+). Z reálné ukázky (triplets-in-four). "
+                    "A/B: rovný běh (A) vs tercie (B)."),
+        "preset": {"density": 2, "approach": 0.0, "color": "wt", "voicing": "rootless",
+                   "chords": "Am7 D7 Gm7 Gm7"},
+        "focus": "scale",
+        "motion": "thirds_down",
+        "ab": {"A": {"motion": "scale"}, "B": {"motion": "thirds_down"}},
+    },
 ]
 
 
@@ -191,6 +205,7 @@ BLOCKS = [
     ("E · Moll", ["minor_ii_v_i"]),
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
+    ("H · Běhy / licky", ["thirds_run"]),
 ]
 
 

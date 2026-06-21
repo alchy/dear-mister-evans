@@ -107,6 +107,21 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
                 if nx < 0 or nx >= len(sc):                    # odraz dovnitř stupnice
                     dd = -dd; nx = cur + dd
                 cur = nx
+        elif motion == "thirds_down":
+            # SESTUPNÉ TERCIE: restart VYSOKO u každého akordu, klesej po terciích (-2 indexy
+            # ve stupnici). Nad dominantou s barvou 'wt' vyjdou augmentované (celotónové) tercie.
+            ceiling = harmony.center + 3
+            cand = [k for k in range(len(sc)) if sc[k] <= ceiling]
+            si = cand[-1] if cand else len(sc) - 1
+            fallback = sc[si]
+            pos, cur, dd = {}, si, -2
+            for n in range(npb):
+                cur = max(0, min(len(sc) - 1, cur))
+                pos[n] = sc[cur]
+                nx = cur + dd
+                if nx < 0:                                     # u dna obrať nahoru (stoupavá varianta)
+                    dd = -dd; nx = cur + dd
+                cur = nx
         elif motion == "thirds":
             # PATTERN PO MALÝCH TERCIÍCH: 4-tónová vzestupná buňka, sekvencovaná o m3 níž
             # (= 2 indexy v symetrické stupnici) -> typický diminished pattern (ukáže symetrii).
