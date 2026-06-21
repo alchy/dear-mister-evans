@@ -287,6 +287,11 @@ class App:
         self._save_job = self.root.after(400, self._save_state)
 
     def _on_close(self):
+        if self._save_job:                            # zruš čekající debounce save
+            try:
+                self.root.after_cancel(self._save_job)
+            except Exception:
+                pass
         self._save_state()
         self.root.destroy()
 
