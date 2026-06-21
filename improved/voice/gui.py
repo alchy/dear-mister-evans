@@ -56,7 +56,7 @@ class App:
         ttk.Separator(outer, orient="vertical").grid(row=0, column=1, sticky="ns", padx=8)
         right = ttk.LabelFrame(
             outer, padding=4,
-            text="Náhled: ● levá ruka (přesun) · ● tóny stupnice · ◯ guide (3/7) · ▼ landing · — co hraje")
+            text="Náhled: ● levá ruka · ● melodie (stupnice) · ● chromatický approach · ◯ guide (3/7) · ▼ landing · — co hraje")
         right.grid(row=0, column=2, sticky="nsew")
         right.rowconfigure(0, weight=1); right.columnconfigure(0, weight=1)
         self._controls(left)

@@ -16,7 +16,8 @@ MAXL = 3
 BASS_LO, BASS_HI = 36, 64        # C2..E4 (bas + voicing)
 MEL_LO, MEL_HI = 55, 88          # G3..E6 (melodie)
 DOT_BASS = "#1f7ae0"
-DOT_MEL = "#e8731e"
+DOT_MEL = "#e8731e"          # melodický tón ZE STUPNICE (diatonický)
+DOT_CHROM = "#a23bd6"       # chromatický approach (MIMO stupnici) -- fialově, vizuálně odlišeno
 VL_LINE = "#1f7ae0"
 ROOT_YEL = "#f0c020"        # naznačený (vynechaný) root u rootless voicingu -- žlutě, bez čísla
 _PC = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -114,8 +115,10 @@ def _seq_pos(g, x0, ky, lo, hi, seq):
 
 
 def _dots(cv, g, pos, color):
+    """color = jedna barva (str) NEBO seznam barev per-kolečko (chromatika odlišena)."""
     for i, (cx, cy) in enumerate(pos):
-        _dot(cv, cx, cy, g.DOTR, fill=color, outline="#333")
+        c = color[i] if isinstance(color, (list, tuple)) else color
+        _dot(cv, cx, cy, g.DOTR, fill=c, outline="#333")
         cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", g.fnum, "bold"))
 
 
@@ -195,7 +198,9 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
         _dot(cv, bx, by, g.DOTR, fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
         if mel_pos[i]:
-            _dots(cv, g, mel_pos[i], DOT_MEL)
+            scpc = set(s % 12 for s in bar.scale)                 # diatonický vs chromatický approach
+            cols = [DOT_MEL if (p % 12 in scpc) else DOT_CHROM for p in mel[i]]
+            _dots(cv, g, mel_pos[i], cols)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
     return (blo, bhi)                                        # bas-rozsah pro hit/set_playing
