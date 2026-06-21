@@ -25,9 +25,18 @@ def whites(lo, m):
     return sum(1 for k in range(lo, m) if k % 12 not in BLACK)
 
 
-def _geom(width):
-    """Spočti rozměry kláves z dostupné šířky plátna -> škálování oknem."""
-    bw = whites(BASS_LO, BASS_HI + 1)
+def _bass_range(harmony):
+    """Rozsah bas klaviatury DYNAMICKY z dat -> levá ruka (bas+voicing) se vždy vejde.
+    + okraj: 2 půltóny dolů, 3 (≈klávesa) nahoru vpravo. (Voice-leading nikdy mimo.)"""
+    lh = [p for b in harmony.bars for p in [b.bass] + list(b.voicing)]
+    lo = (min(lh) - 2) if lh else BASS_LO
+    hi = (max(lh) + 3) if lh else BASS_HI
+    return max(24, lo), min(96, hi)
+
+
+def _geom(width, bass_lo, bass_hi):
+    """Rozměry kláves z dostupné šířky plátna (škálování oknem) + dynamický rozsah basu."""
+    bw = whites(bass_lo, bass_hi + 1)
     mw = whites(MEL_LO, MEL_HI + 1)
     avail = max(420, width - 2 * PAD - 18)          # rezerva na scrollbar
     ww = min(34.0, max(10.0, avail / (bw + mw + 1.8)))   # 1.8 bílých na mezeru
@@ -40,6 +49,7 @@ def _geom(width):
     g.LBL = 16                                       # pevné pásmo popisku (font neškáluje)
     g.GAP = ww * 0.85
     g.ROW_H = g.LBL + g.WH + g.GAP
+    g.bass_lo, g.bass_hi = bass_lo, bass_hi
     g.mel_x0 = bw * ww + g.COL_GAP
     g.fnum = max(7, int(ww * 0.5))                   # čísla koleček škálují s klávesami
     g.flbl = 9                                       # popisek akord·stupnice = PEVNÝ font (nepřekrývá)
@@ -112,7 +122,8 @@ def _sym(bar):
 
 def draw(cv, harmony, landings, line=None, width=None, flip=False):
     cv.delete("all")
-    g = _geom(width if width is not None else cv.winfo_width())
+    blo, bhi = _bass_range(harmony)                          # bas klaviatura dle dat
+    g = _geom(width if width is not None else cv.winfo_width(), blo, bhi)
     bars = harmony.bars
     n = len(bars)
     mel = _by_bar(line, n) if line else None
@@ -126,7 +137,7 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
         ky = y0 + g.LBL
         cv.create_text(2, y0, anchor="nw", text=f"{_sym(bar)}  ·  {bar.scale_name}",
                        font=("Segoe UI", g.flbl, "bold"), fill="#234")
-        _kbd(cv, g, 0, ky, BASS_LO, BASS_HI)
+        _kbd(cv, g, 0, ky, g.bass_lo, g.bass_hi)
         _kbd(cv, g, g.mel_x0, ky, MEL_LO, MEL_HI)
         baseM = ky + g.WH - 4
         for p in bar.scale:                                   # 2) tóny stupnice (paleta)
@@ -140,7 +151,7 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
     # 1) levá ruka: pozice bublin -> čáry voice-leadingu MEZI BUBLINAMI (chromatika LH),
     #    NE na klávesy. Spojí k-tý hlas akordu i s k-tým hlasem akordu i+1.
-    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, BASS_LO, BASS_HI, [bar.bass] + sorted(bar.voicing))
+    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass] + sorted(bar.voicing))
           for i, bar in enumerate(bars)]
     for i in range(n - 1):
         a, b = lh[i], lh[i + 1]
@@ -153,24 +164,25 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
             _dots(cv, g, _seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]), DOT_MEL)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
+    return (blo, bhi)                                        # bas-rozsah pro hit/set_playing
 
 
-def set_playing(cv, row, n_bars, width=None, flip=False):
+def set_playing(cv, row, n_bars, bass_range, width=None, flip=False):
     """Zelená linka pod právě hraným řádkem (respektuje flip). row=None zhasne."""
     cv.delete("playline")
     if row is None or not (0 <= row < n_bars):
         return
-    g = _geom(width if width is not None else cv.winfo_width())
+    g = _geom(width if width is not None else cv.winfo_width(), *bass_range)
     s = (n_bars - 1 - row) if flip else row
     y = PAD + s * g.ROW_H + g.LBL + g.WH + 2
     x1 = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW
     cv.create_line(0, y, x1, y, fill="#10c040", width=3, tags="playline")
 
 
-def hit(cv, x, y, n_bars, width=None, flip=False):
+def hit(cv, x, y, n_bars, bass_range, width=None, flip=False):
     """Klik (canvas coords) -> (data_row, side) kde side='chord' (levá klávesnice)
     nebo 'line' (pravá). Mimo klávesy vrátí None. Respektuje flip."""
-    g = _geom(width if width is not None else cv.winfo_width())
+    g = _geom(width if width is not None else cv.winfo_width(), *bass_range)
     slot = int((y - PAD) // g.ROW_H)
     if not (0 <= slot < n_bars):
         return None
@@ -178,7 +190,7 @@ def hit(cv, x, y, n_bars, width=None, flip=False):
     if not (ky <= y <= ky + g.WH):
         return None
     row = (n_bars - 1 - slot) if flip else slot
-    bass_w = whites(BASS_LO, BASS_HI + 1) * g.WW
+    bass_w = whites(g.bass_lo, g.bass_hi + 1) * g.WW
     mel_w = whites(MEL_LO, MEL_HI + 1) * g.WW
     if x <= bass_w:
         return (row, "chord")

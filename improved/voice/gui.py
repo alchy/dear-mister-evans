@@ -36,6 +36,7 @@ class App:
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
         self._draw_state = None                    # (harmony, landings, line) pro překreslení
+        self._bass_range = (36, 64)                # dynamický rozsah bas klaviatury (z draw)
         self._resize_job = None
         self._build()
 
@@ -160,61 +161,75 @@ class App:
         self._resize_job = None
         if self._draw_state:
             H, land, line = self._draw_state
-            view.draw(self.canvas, H, land, line, width=self.canvas.winfo_width(),
-                      flip=self.flip.get())
+            self._bass_range = view.draw(self.canvas, H, land, line,
+                                         width=self.canvas.winfo_width(), flip=self.flip.get())
 
     # ---- klik na klaviaturu = přehraj zobrazený blok (vlevo akord, vpravo linka) ----
-    def on_kbd_click(self, event):
-        if self._draw_state is None:
-            return
-        if self.worker and self.worker.is_alive():       # přeruš předchozí, ať klik vždy zahraje
+    # ---------- JEDEN model přehrávání (DRY pro všechny komponenty) ----------
+    def _start(self, work):
+        """Přeruš případné předchozí přehrávání a spusť nový worker. Společné pro
+        plné přehrání i klik na klávesy."""
+        if self.worker and self.worker.is_alive():
             self.stop.set(); self.worker.join(timeout=0.3)
-        H, land, line = self._draw_state
-        x = self.canvas.canvasx(event.x); y = self.canvas.canvasy(event.y)
-        h = view.hit(self.canvas, x, y, len(H), width=self.canvas.winfo_width(), flip=self.flip.get())
-        if not h:
-            return
-        row, side = h
-        bar = H.bars[row]
-        if side == "chord":
-            self._play_block("chord", [bar.bass] + list(bar.voicing), f"akord {view._sym(bar)}")
-        else:
-            mel = view._by_bar(line, len(H))[row] if line else []
-            self._play_block("line", mel, f"linka {view._sym(bar)}")
-
-    def _play_block(self, kind, notes, what):
-        notes = [int(n) for n in notes if n]
-        if not notes:
-            return
         self.stop.clear()
+        self.worker = threading.Thread(target=work, daemon=True)
+        self.worker.start()
+
+    def _with_port(self, body):
+        """Otevři port, spusť body(out), na konci VŽDY zhasni všechny tóny."""
         name = self.port.get()
         if not name:
             self.status.set("Není vybraný MIDI port."); return
-        bpm = max(1, self.bpm.get())
-
-        def run():
-            import time
+        with mido.open_output(name) as out:
             try:
-                self.status.set(f"Hraji {what}…")
-                with mido.open_output(name) as out:
-                    if kind == "chord":
-                        for nn in notes:
-                            out.send(mido.Message("note_on", note=nn, velocity=76))
-                        time.sleep(1.6)
-                        for nn in notes:
-                            out.send(mido.Message("note_off", note=nn, velocity=0))
-                    else:
-                        d = 60.0 / bpm / 2
-                        for nn in notes:
-                            if self.stop.is_set():
-                                break
-                            out.send(mido.Message("note_on", note=nn, velocity=92)); time.sleep(d * 0.9)
-                            out.send(mido.Message("note_off", note=nn, velocity=0)); time.sleep(d * 0.1)
-                if not self.stop.is_set():
-                    self.status.set(f"Hotovo ({what}).")
-            except Exception as e:
-                traceback.print_exc(); self.status.set(f"Chyba: {e}")
-        self.worker = threading.Thread(target=run, daemon=True); self.worker.start()
+                body(out)
+            finally:
+                for ch in range(16):
+                    out.send(mido.Message("control_change", channel=ch, control=123, value=0))
+
+    def _set_playing(self, row, n_bars=0):
+        view.set_playing(self.canvas, row, n_bars, self._bass_range, flip=self.flip.get())
+
+    def on_kbd_click(self, event):
+        if self._draw_state is None:
+            return
+        H, land, line = self._draw_state
+        x = self.canvas.canvasx(event.x); y = self.canvas.canvasy(event.y)
+        h = view.hit(self.canvas, x, y, len(H), self._bass_range,
+                     width=self.canvas.winfo_width(), flip=self.flip.get())
+        if not h:
+            return
+        row, side = h; bar = H.bars[row]
+        if side == "chord":
+            notes, what = [bar.bass] + list(bar.voicing), f"akord {view._sym(bar)}"
+        else:
+            notes, what = (view._by_bar(line, len(H))[row] if line else []), f"linka {view._sym(bar)}"
+        self._start(lambda: self._work_block(side, notes, what))
+
+    def _work_block(self, side, notes, what):
+        notes = [int(n) for n in notes if n]
+        if not notes:
+            return
+        self.status.set(f"Hraji {what}…")
+        self._with_port(lambda out: self._send_block(out, side, notes))
+        if not self.stop.is_set():
+            self.status.set(f"Hotovo ({what}).")
+
+    def _send_block(self, out, side, notes):
+        import time
+        if side == "chord":                                   # akord = vše naráz, drž
+            for nn in notes:
+                out.send(mido.Message("note_on", note=nn, velocity=76))
+            time.sleep(1.6)
+            for nn in notes:
+                out.send(mido.Message("note_off", note=nn, velocity=0))
+        else:                                                 # linka = tóny v pořadí
+            d = 60.0 / max(1, self.bpm.get()) / 2
+            for nn in notes:
+                if self.stop.is_set():
+                    break
+                out.send(mido.Message("note_on", note=nn, velocity=92)); time.sleep(d * 0.9)
+                out.send(mido.Message("note_off", note=nn, velocity=0)); time.sleep(d * 0.1)
 
     def refresh_ports(self):
         names = mido.get_output_names() or [""]
@@ -232,18 +247,15 @@ class App:
 
     def on_stop(self):
         self.stop.set()
+        self._set_playing(None)
         self.status.set("Stop.")
 
     def on_play(self):
-        if self.worker and self.worker.is_alive():
-            self.status.set("Už hraji — nejdřív Stop.")
-            return
-        self.stop.clear()
-        self.worker = threading.Thread(target=self._gen_play, daemon=True)
-        self.worker.start()
+        self._start(self._work_generate)                      # stejný model jako klik
 
-    def _gen_play(self):
+    def _work_generate(self):
         try:
+            self.status.set("Generuji…")
             H = Harmony(self.chords.get(), color=self.color.get(), voicing=self.voicing.get())
             line = build.generate(H, density=self.density.get(),
                                   seed=self.seed.get(), approach=self.approach.get())
@@ -252,35 +264,28 @@ class App:
             self._draw_state = (H, landings, line)             # ulož pro responzivní překreslení
             self.root.after(0, self._redraw)
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
-            self._play_follow(self.preview, len(H))
+            self._with_port(lambda out: self._send_follow(out, self.preview, len(H)))
             if not self.stop.is_set():
                 self.status.set("Hotovo.")
         except Exception as e:
             traceback.print_exc()
             self.status.set(f"Chyba: {e}")
         finally:
-            self.root.after(0, lambda: view.set_playing(self.canvas, None, 0))
+            self.root.after(0, lambda: self._set_playing(None))
 
-    def _play_follow(self, path, n_bars):
-        """Přehraje MIDI a z playheadu rozsvěcí zelenou linku u právě hraného akordu."""
-        name = self.port.get()
-        if not name:
-            raise RuntimeError("Není vybraný MIDI port.")
+    def _send_follow(self, out, path, n_bars):
+        """Plné přehrání: z playheadu rozsvěcí zelenou linku u právě hraného akordu."""
         bar_s = 4 * 60.0 / max(1, self.bpm.get())
         cur = -1; t = 0.0
-        with mido.open_output(name) as out:
-            for msg in mido.MidiFile(path).play():
-                if self.stop.is_set():
-                    break
-                t += msg.time
-                bar = int(t / bar_s)
-                if bar != cur and 0 <= bar < n_bars:
-                    cur = bar
-                    self.root.after(0, lambda b=bar: view.set_playing(
-                        self.canvas, b, n_bars, flip=self.flip.get()))
-                out.send(msg)
-            for ch in range(16):
-                out.send(mido.Message("control_change", channel=ch, control=123, value=0))
+        for msg in mido.MidiFile(path).play():
+            if self.stop.is_set():
+                break
+            t += msg.time
+            bar = int(t / bar_s)
+            if bar != cur and 0 <= bar < n_bars:
+                cur = bar
+                self.root.after(0, lambda b=bar: self._set_playing(b, n_bars))
+            out.send(msg)
 
 
 def main():
