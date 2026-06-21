@@ -160,6 +160,10 @@ class App:
         ttk.Label(a, text="Seed:").grid(row=2, column=2, sticky="e", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(a, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=3, sticky="w", **pad)
+        ttk.Label(a, text="Prostor:").grid(row=3, column=0, sticky="w", **pad)
+        self.space = tk.DoubleVar(value=0.0)
+        ttk.Spinbox(a, from_=0.0, to=0.75, increment=0.25, textvariable=self.space, width=5).grid(
+            row=3, column=1, sticky="w", **pad)
         ttk.Label(a, text="Akordy:").grid(row=4, column=0, sticky="w", **pad)
         self.chords = tk.StringVar(value=prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
         ttk.Entry(a, textvariable=self.chords, width=30).grid(row=4, column=1, columnspan=3, sticky="we", **pad)
@@ -235,6 +239,7 @@ class App:
         self.density.set(p.get("density", 2))
         self.approach.set(p.get("approach", 0.5))
         self.enclose.set(p.get("enclose", 0.0))
+        self.space.set(p.get("space", 0.0))
         self.bebop.set(bool(p.get("bebop", False)))
         self.color.set(p.get("color", "inside"))
         self.voicing.set(voi.LABELS.get(p.get("voicing", "rootless"), voi.LABELS["rootless"]))
@@ -302,6 +307,7 @@ class App:
         density = int(over.get("density", self.density.get()))
         approach = float(over.get("approach", self.approach.get()))
         enclose = float(over.get("enclose", self.enclose.get()))
+        space = float(over.get("space", self.space.get()))
         bebop = bool(over.get("bebop", self.bebop.get()))
         color = over.get("color", self.color.get())
         kind = over.get("voicing", self._kind())
@@ -309,13 +315,13 @@ class App:
         scale_ov = over.get("scale", self._scale_ov)
         H = Harmony(self.chords.get(), color=color, voicing=kind, bebop=bebop, scale_override=scale_ov)
         line = build.generate(H, density=density, seed=self.seed.get(), approach=approach,
-                              enclose=enclose, motion=motion)
+                              enclose=enclose, motion=motion, space=space)
         _, landings = build.guide_path(H)
         return H, landings, line, density
 
     # ---------- serializace nastavení do JSON (jako prototyp) ----------
     PERSIST = ["lesson", "root_note", "mode", "pattern", "chords", "density", "approach",
-               "enclose", "bebop", "color", "bpm", "seed", "voicing", "port", "flip"]
+               "enclose", "space", "bebop", "color", "bpm", "seed", "voicing", "port", "flip"]
 
     def _state_dict(self):
         return {k: getattr(self, k).get() for k in self.PERSIST if hasattr(self, k)}
@@ -344,7 +350,7 @@ class App:
                         pass
             setv("root_note"); setv("mode")
             self._refresh_patterns()                  # nabídka postupů dle načtené tonality
-            for k in ("pattern", "chords", "density", "approach", "enclose", "bebop",
+            for k in ("pattern", "chords", "density", "approach", "enclose", "space", "bebop",
                       "color", "bpm", "seed", "voicing", "port", "flip", "lesson"):
                 setv(k)
             if "lesson" in d:

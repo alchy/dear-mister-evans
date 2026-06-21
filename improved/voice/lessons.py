@@ -229,6 +229,19 @@ LESSONS = [
         "motion": "seq_up",
         "ab": {"A": {"scale": "min_pent"}, "B": {"scale": "maj_pent"}},
     },
+    # --- Blok I: frázování ---
+    {
+        "key": "phrasing_space",
+        "title": "20 · Frázování — prostor (dýchání)",
+        "explain": ("Ticho je nota. Fráze ~ na jeden nádech (1–2 takty), pak PAUZA — linka "
+                    "dýchá (less is more). Začátečníci hrají moc; cvič i pauzy. A/B: souvislé "
+                    "(A, busy) vs s prostorem (B, hraj takt – nádech takt)."),
+        "preset": {"density": 2, "approach": 0.5, "space": 0.5, "voicing": "rootless",
+                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "focus": None,
+        "motion": "arp",
+        "ab": {"A": {"space": 0.0}, "B": {"space": 0.5}},
+    },
 ]
 
 
@@ -242,6 +255,7 @@ BLOCKS = [
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
     ("H · Běhy / licky", ["thirds_run", "thirds_run_up", "fourths_run", "pent_seq"]),
+    ("I · Frázování", ["phrasing_space"]),
 ]
 
 

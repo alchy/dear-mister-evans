@@ -85,7 +85,7 @@ def guide_path(harmony):
     return entries, landings
 
 
-def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp", taste=None):
+def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp", space=0.0, taste=None):
     """harmony = Harmony, density = not/dobu. Vrať [(onset, délka, MIDI)].
     DRILL se zaměřením na LANDING tóny: 1. doba = guide tón (voice-led), pak akordové
     arpeggio v JEDNOM směru přes takt (takty střídají klesající/stoupající -> jasný
@@ -219,6 +219,10 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
             line.append((i * BPC + n / density, (1.0 / density) * 0.9, p))
             prev = p
         prev_exit = prev
+    if space > 0:                                            # FRÁZOVÁNÍ: fráze = 2 takty, konec utichne
+        phr = 2 * BPC                                        # (nech dýchat -> 'less is more')
+        keep = phr * (1.0 - space)
+        line = [(o, d, p) for (o, d, p) in line if (o % phr) < keep - 1e-9]
     return line
 
 
