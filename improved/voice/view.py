@@ -11,13 +11,13 @@ LANDING tón do dalšího akordu (▼). Zelená linka = indikace právě hranéh
 import tkinter as tk
 
 BLACK = {1, 3, 6, 8, 10}
-WW, WH = 15, 48
-LBL = 13
-GAP = 16
+WW, WH = 20, 62          # klávesy +30 %
+LBL = 14
+GAP = 18
 ROW_H = LBL + WH + GAP
-COL_GAP = 22
+COL_GAP = 28
 PAD = 6
-DOTR = 7
+DOTR = 9
 BASS_LO, BASS_HI = 36, 64        # C2..E4 (bas + voicing)
 MEL_LO, MEL_HI = 55, 88          # G3..E6 (melodie)
 DOT_BASS = "#1f7ae0"
@@ -66,8 +66,8 @@ def _seq(cv, x0, ky, lo, hi, seq, color):
     """Číslovaná kolečka v pořadí hraní. Dráhové schodiště: drží patro během
     směrového běhu; při OPAKOVÁNÍ tónu nebo ZMĚNĚ SMĚRU patro výš (jen nahoru ->
     menší číslo není nikdy nad větším)."""
-    STEP, MAXL = 12, 3
-    base = ky + WH - 10
+    STEP, MAXL = 15, 3
+    base = ky + WH - 12
     level, prevdir = 0, 0
     for i, p in enumerate(seq):
         if i > 0:
@@ -80,7 +80,7 @@ def _seq(cv, x0, ky, lo, hi, seq, color):
         cx = _cx(x0, lo, hi, p)
         cy = base - level * STEP
         _dot(cv, cx, cy, DOTR, fill=color, outline="#333")
-        cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 7, "bold"))
+        cv.create_text(cx, cy, text=str(i + 1), fill="white", font=("Segoe UI", 9, "bold"))
 
 
 def _by_bar(line, n):
@@ -111,12 +111,12 @@ def draw(cv, harmony, landings, line=None):
         baseM = ky + WH - 4
         for p in bar.scale:                                   # 2) tóny stupnice (paleta)
             if MEL_LO <= p <= MEL_HI:
-                _dot(cv, _cx(mx0, MEL_LO, MEL_HI, p), baseM, 2.5, fill="#bfe3c0", outline="")
+                _dot(cv, _cx(mx0, MEL_LO, MEL_HI, p), baseM, 3.5, fill="#bfe3c0", outline="")
         for p in bar.guides:                                  # guide tóny (3/7)
             if MEL_LO <= p <= MEL_HI:
-                _dot(cv, _cx(mx0, MEL_LO, MEL_HI, p), baseM, 5, outline="#2a9d3a", width=2, fill="")
+                _dot(cv, _cx(mx0, MEL_LO, MEL_HI, p), baseM, 6, outline="#2a9d3a", width=2, fill="")
         cv.create_text(_cx(mx0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
-                       fill="#e23030", font=("Segoe UI", 10, "bold"))
+                       fill="#e23030", font=("Segoe UI", 13, "bold"))
     # 1) čáry voice-leadingu mezi sousedními voicingy (levá ruka)
     for i in range(len(bars) - 1):
         yb = PAD + i * ROW_H + LBL + WH

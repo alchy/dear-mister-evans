@@ -108,7 +108,7 @@ class App:
                   wraplength=260).grid(row=r, column=0, columnspan=4, sticky="w", **pad)
 
     def _preview(self, f):
-        self.canvas = tk.Canvas(f, width=560, height=540, bg="#fafafa", highlightthickness=0)
+        self.canvas = tk.Canvas(f, width=820, height=680, bg="#fafafa", highlightthickness=0)
         sb = ttk.Scrollbar(f, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=sb.set)
         self.canvas.grid(row=0, column=0, sticky="nsew")
