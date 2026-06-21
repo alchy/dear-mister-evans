@@ -63,6 +63,8 @@ def scale_name_for(q, resolves_to_minor=False, color="inside"):
     if q == "dim7":
         return "dim_wh"
     if q == "7":
+        if color == "dim":                              # půltón-celý diminished (7b9: b9 #9 #11 13)
+            return "dim_hw"
         if resolves_to_minor:
             return "altered" if color == "outside" else "phrygian_dom"
         return "bebop_dom" if color == "inside" else "lydian_dom"

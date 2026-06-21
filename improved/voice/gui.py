@@ -149,7 +149,7 @@ class App:
             row=1, column=2, columnspan=2, sticky="w", **pad)
         ttk.Label(a, text="Barva (V→moll):").grid(row=2, column=0, sticky="w", **pad)
         self.color = tk.StringVar(value="inside")
-        ttk.OptionMenu(a, self.color, "inside", "inside", "outside").grid(row=2, column=1, sticky="w", **pad)
+        ttk.OptionMenu(a, self.color, "inside", "inside", "outside", "dim").grid(row=2, column=1, sticky="w", **pad)
         ttk.Label(a, text="Seed:").grid(row=2, column=2, sticky="e", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(a, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=3, sticky="w", **pad)

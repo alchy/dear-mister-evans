@@ -126,6 +126,18 @@ LESSONS = [
         "focus": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "outside"}},
     },
+    # --- Blok F: barevné / symetrické stupnice ---
+    {
+        "key": "diminished_dom",
+        "title": "12 · Diminished na dominantě (půltón-celý)",
+        "explain": ("Symetrická 8-tónová stupnice (H–W–H–W) na dominantě dá barvu 7♭9: "
+                    "♭9 ♯9 ♯11 13. Opakuje se po malé tercii (4 stejné útvary) → snadné "
+                    "transpozice patternů. Paleta ukáže 8 tónů. A/B: mixo/bebop (A) vs diminished (B)."),
+        "preset": {"density": 2, "approach": 0.3, "color": "dim", "voicing": "rootless",
+                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "focus": "scale",
+        "ab": {"A": {"color": "inside"}, "B": {"color": "dim"}},
+    },
 ]
 
 
@@ -136,6 +148,7 @@ BLOCKS = [
     ("C · Ozdoby", ["approach", "enclosure", "bebop_scale"]),
     ("D · Levá ruka", ["voice_leading", "voicing_textures"]),
     ("E · Moll", ["minor_ii_v_i"]),
+    ("F · Barevné stupnice", ["diminished_dom"]),
 ]
 
 
