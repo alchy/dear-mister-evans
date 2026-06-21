@@ -16,6 +16,16 @@
     { "name": "Fly Me to the Moon", "key": "C",
       "changes": "Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Am7" },
     { "name": "So What (modal)", "key": "Dm",
-      "changes": "Dm7 Dm7 Dm7 Dm7 Ebm7 Ebm7 Dm7 Dm7" }
+      "changes": "Dm7 Dm7 Dm7 Dm7 Ebm7 Ebm7 Dm7 Dm7" },
+    { "name": "There Will Never Be Another You (A)", "key": "Eb",
+      "changes": "Ebmaj7 Ebmaj7 Dm7b5 G7 Cm7 Cm7 Bbm7 Eb7 Abmaj7 Abmaj7 Abm7 Db7 Ebmaj7 Cm7 F7 F7" },
+    { "name": "Stella by Starlight", "key": "Bb",
+      "changes": "Em7b5 A7 Cm7 F7 Fm7 Bb7 Ebmaj7 Ab7 Bbmaj7 Em7b5 A7 Dm7 Bbm7 Eb7 Fmaj7 Em7b5 A7 Am7b5 D7 G7 G7 Cm7 Cm7 Ab7 Ab7 Bbmaj7 Bbmaj7 Em7b5 A7 Dm7b5 G7 Cm7b5 F7 Bbmaj7 Bbmaj7" },
+    { "name": "My Favorite Things", "key": "Em",
+      "changes": "Em7 Em7 Em7 Em7 Emaj7 Emaj7 Emaj7 Emaj7 Cmaj7 Cmaj7 F#m7b5 B7 Em7 Em7 Em7 Em7" },
+    { "name": "Days of Wine and Roses", "key": "F",
+      "changes": "Fmaj7 Eb7 Am7 D7 Gm7 Gm7 Bbm7 Eb7 Am7 D7 Gm7 C7 Fmaj7 Dm7 Gm7 C7" },
+    { "name": "Beautiful Love", "key": "Dm",
+      "changes": "Em7b5 A7 Dm7 Dm7 Gm7 C7 Fmaj7 Bb7 Em7b5 A7 Dm7 Dm7 Gm7 Gm7 Em7b5 A7" }
   ]
 }
