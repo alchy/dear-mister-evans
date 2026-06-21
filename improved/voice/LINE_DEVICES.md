@@ -57,6 +57,14 @@ SPOJKY mezi sousedními cíli, typ:
 ```
 Výběr/tvar spojky váží naučený Evans vkus + osa inside↔outside + parametry lekce.
 
+## Slovník = teoretická zařízení, NE (jen) Evans
+Primární vokabulář builderu jsou **teoreticky odvozená zařízení** (approach/enclosure/
+digitální buňky/bebop běhy, idiomy ii–V–I dur i moll), ne opsané licky ani závislost
+na Evans prioru. Knihovna spojek je **seedovaná z teorie** (funguje i bez jakýchkoli
+dat). **Evans prior = volitelná vrstva vkusu** (váží výběr/tvar), kterou lze vypnout
+nebo nahradit feedbackem uživatele. Mistrovské licky se NEkopírují (copyright) — z nich
+bereme jen *kategorie zařízení* (obklíčení 3, bebop sestup, 1235, altered arpeggio).
+
 ## Zdroje
 - antonjazz.com — Approaches and Enclosures
 - jazzlessonvideos.com — 15 Approach Note and Enclosure Exercises
@@ -64,3 +72,4 @@ Výběr/tvar spojky váží naučený Evans vkus + osa inside↔outside + parame
 - pianowithjonny.com — Guide Tones: The Complete Guide
 - fundamental-changes.com — Combining Arpeggios with the Bebop Scale; Chromatic Approach Notes
 - pianogroove.com — Targeting the 3rds; jazzetudes.net — Targeting Chord Tones
+- jefflewistrumpet.com — Jazz Licks in 12 Keys (jen kategorie zařízení ii–V–I dur/moll; licky nereprodukovány)

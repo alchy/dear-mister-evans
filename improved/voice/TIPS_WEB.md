@@ -55,7 +55,8 @@ Melodická moll (vzestupná) `1 2 ♭3 4 5 6 7` a jejích 7 modů (faktická teo
 - maj7 (tónika) -> **Lydická** (♯5 -> lyd. zvětšená)
 - m7 (ii) -> **Dórská**
 - 7 -> dur -> **Mixolydická / bebop dominant** (průchod 7–root drží chord-tóny na těžké)
-- 7 -> moll -> **Altered** (mode 7) [nebo Mixo ♭6]
+- 7 -> moll -> **Altered** (mode 7) [napjaté] / **frygická dominanta** (harm. moll, mód 5) [„inside"] / Mixo ♭6
+- i (tónická moll) -> **harmonická / melodická moll**
 - 7♯11 / tritón. subst. (nerozvádí) -> **Lydická dominanta** (mode 4)
 - 7♭9 / ♯9 -> **zmenšená půl-celý** (half-whole)
 - 7♯5 / aug / celotónová barva -> **celotónová**
