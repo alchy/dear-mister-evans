@@ -91,10 +91,15 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
         elif entry >= harmony.hi - 7:
             d = -1
         if motion == "scale":
-            # BĚH PO STUPNICI: krok po kroku v jednom směru -> ukáže CELOU chord-scale
-            si = min(range(len(sc)), key=lambda k: abs(sc[k] - entry))
+            # BĚH PO STUPNICI OD KOŘENE vzhůru -> ukáže pattern stupnice (H-W-...) od toniky;
+            # při density 2 je to přesně jedna oktáva (8-tónové dim/bebop = celá stupnice).
+            root_pc = bar.root % 12
+            roots = [k for k, s in enumerate(sc) if s % 12 == root_pc]
+            fit = [k for k in roots if k + npb - 1 < len(sc)]   # vzestupný běh se vejde (bez odrazu)
+            si = (fit[0] if fit else (roots[0] if roots
+                  else min(range(len(sc)), key=lambda k: abs(sc[k] - entry))))
             fallback = sc[si]
-            pos, cur, dd = {}, si, d
+            pos, cur, dd = {}, si, 1                            # vždy vzhůru (čitelný pattern)
             for n in range(npb):
                 cur = max(0, min(len(sc) - 1, cur))
                 pos[n] = sc[cur]
@@ -102,8 +107,6 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
                 if nx < 0 or nx >= len(sc):                    # odraz dovnitř stupnice
                     dd = -dd; nx = cur + dd
                 cur = nx
-            if npb >= 2:                                        # poslední tón = approach do dalšího akordu
-                pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, fallback), sc, rng, approach)
         else:
             # CÍLE na doby = akordové arpeggio v jednom směru (odraz od kraje, bez duplikace)
             ci = min(range(len(ct)), key=lambda k: abs(ct[k] - entry))
