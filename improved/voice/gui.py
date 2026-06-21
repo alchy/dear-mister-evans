@@ -191,12 +191,14 @@ class App:
     def apply_lesson(self, _title=None):
         les = lessons.by_title(self.lesson.get())
         p = les.get("preset", {})
-        if "density" in p: self.density.set(p["density"])
-        if "approach" in p: self.approach.set(p["approach"])
-        if "enclose" in p: self.enclose.set(p["enclose"])
-        self.bebop.set(bool(p.get("bebop", False)))   # vždy nastav (lekce bez bebopu = vypnuto)
-        if "color" in p: self.color.set(p["color"])
-        if p.get("voicing") in voi.LABELS: self.voicing.set(voi.LABELS[p["voicing"]])
+        # VŽDY nastav všechny generativní páky (preset NEBO default) -> lekce je soběstačná,
+        # nic neprosakuje z předchozí lekce (color/enclose/density/...).
+        self.density.set(p.get("density", 2))
+        self.approach.set(p.get("approach", 0.5))
+        self.enclose.set(p.get("enclose", 0.0))
+        self.bebop.set(bool(p.get("bebop", False)))
+        self.color.set(p.get("color", "inside"))
+        self.voicing.set(voi.LABELS.get(p.get("voicing", "rootless"), voi.LABELS["rootless"]))
         if "root" in p: self.root_note.set(p["root"])
         if "mode" in p:
             self.mode.set(p["mode"]); self._refresh_patterns()
