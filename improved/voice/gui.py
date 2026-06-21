@@ -13,9 +13,9 @@ import tkinter as tk
 from tkinter import ttk
 import mido
 
-from voice.harmony import Harmony
+from voice.harmony import Harmony, TEMPLATES
 from voice.render import to_midi
-from voice import melody
+from voice import build
 
 
 def default_port(names):
@@ -35,7 +35,6 @@ class App:
         self.stop = threading.Event()
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
-        self.model = melody.get_model()          # Evansův prior (cache); None -> fallback
         self._build()
 
     def _build(self):
@@ -51,8 +50,14 @@ class App:
         ttk.Button(f, text="⟳", width=3, command=self.refresh_ports).grid(row=r, column=3, **pad)
         r += 1
 
+        ttk.Label(f, text="Šablona:").grid(row=r, column=0, sticky="w", **pad)
+        self.template = tk.StringVar(value="ii–V–I dur (C)")
+        ttk.OptionMenu(f, self.template, self.template.get(), *TEMPLATES,
+                       command=self._set_template).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
+        r += 1
+
         ttk.Label(f, text="Akordy:").grid(row=r, column=0, sticky="w", **pad)
-        self.chords = tk.StringVar(value="Dm7 G7 Cmaj7 Cmaj7")
+        self.chords = tk.StringVar(value=TEMPLATES["ii–V–I dur (C)"])
         ttk.Entry(f, textvariable=self.chords, width=40).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
         r += 1
 
@@ -67,10 +72,16 @@ class App:
         ttk.Label(f, text="Seed:").grid(row=r, column=0, sticky="w", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(f, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=r, column=1, sticky="w", **pad)
-        ttk.Label(f, text="Dobrodružnost:").grid(row=r, column=2, sticky="e", **pad)
-        self.temp = tk.DoubleVar(value=1.0)
-        ttk.Spinbox(f, from_=0.6, to=1.8, increment=0.1, textvariable=self.temp, width=6).grid(
+        ttk.Label(f, text="Approach:").grid(row=r, column=2, sticky="e", **pad)
+        self.approach = tk.DoubleVar(value=0.7)
+        ttk.Spinbox(f, from_=0.0, to=1.0, increment=0.1, textvariable=self.approach, width=6).grid(
             row=r, column=3, sticky="w", **pad)
+        r += 1
+
+        ttk.Label(f, text="Barva (V→moll):").grid(row=r, column=0, sticky="w", **pad)
+        self.color = tk.StringVar(value="inside")
+        ttk.OptionMenu(f, self.color, self.color.get(), "inside", "outside").grid(
+            row=r, column=1, sticky="w", **pad)
         r += 1
 
         btns = ttk.Frame(f)
@@ -80,8 +91,7 @@ class App:
         ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3)
         r += 1
 
-        msg = "Připraveno." if self.model else "Připraveno. (prior nenačten — fallback krokový pohyb)"
-        self.status = tk.StringVar(value=msg)
+        self.status = tk.StringVar(value="Připraveno. (builder cíl+spojka — guide tóny → bebop/approach)")
         ttk.Label(f, textvariable=self.status, foreground="#246", width=52, anchor="w").grid(
             row=r, column=0, columnspan=4, sticky="w", **pad)
 
@@ -94,6 +104,11 @@ class App:
         if self.port.get() not in names:
             self.port.set(default_port(names))
         self.status.set(f"Porty obnoveny ({len(names)}).")
+
+    def _set_template(self, name):
+        if name in TEMPLATES:
+            self.chords.set(TEMPLATES[name])
+            self.status.set(f"Šablona: {name}")
 
     def on_reseed(self):
         self.seed.set((self.seed.get() + 1) % 10000)
@@ -113,9 +128,9 @@ class App:
 
     def _gen_play(self):
         try:
-            H = Harmony(self.chords.get())
-            line = melody.generate(H, self.model, density=self.density.get(),
-                                   seed=self.seed.get(), temperature=self.temp.get())
+            H = Harmony(self.chords.get(), color=self.color.get())
+            line = build.generate(H, density=self.density.get(),
+                                  seed=self.seed.get(), approach=self.approach.get())
             to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
             self._play_file(self.preview)
