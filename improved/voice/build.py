@@ -62,7 +62,7 @@ def guide_path(harmony):
     return entries, landings
 
 
-def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, taste=None):
+def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp", taste=None):
     """harmony = Harmony, density = not/dobu. Vrať [(onset, délka, MIDI)].
     DRILL se zaměřením na LANDING tóny: 1. doba = guide tón (voice-led), pak akordové
     arpeggio v JEDNOM směru přes takt (takty střídají klesající/stoupající -> jasný
@@ -70,6 +70,8 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, taste=None):
     do dalšího akordu. approach = jak často je to chromatický náběh (0..1).
     enclose = pravděpodobnost OBKLÍČENÍ cíle (horní soused stupnice + spodní půltón ->
     cíl); aktivní jen při density >= 3 (potřebuje 2 sloty před cílem).
+    motion = 'arp' (akordové arpeggio, default) | 'scale' (BĚH PO STUPNICI -> ukáže celou
+    chord-scale; pro stupnicové lekce: bebop/diminished/chord-scales).
     taste = volitelný (Evans) model; None = čistě teoretický drill."""
     rng = random.Random(seed)
     npb = density * BEATS
@@ -88,39 +90,55 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, taste=None):
             d = 1
         elif entry >= harmony.hi - 7:
             d = -1
-        # CÍLE na doby = akordové arpeggio v jednom směru (odraz od kraje, bez duplikace)
-        ci = min(range(len(ct)), key=lambda k: abs(ct[k] - entry))
-        targets = [ct[ci]]
-        for b in range(1, BEATS):
-            ni = ci + d
-            if ni < 0 or ni >= len(ct):                       # odraz dovnitř rejstříku
-                d = -d; ni = ci + d
-            ni = max(0, min(len(ct) - 1, ni))
-            targets.append(ct[ni]); ci = ni
-        # POZICE: arpeggio na doby; offbeaty stupnicově spojí / approachnou / OBKLÍČÍ další cíl
-        pos = {b * density: targets[b] for b in range(BEATS)}
-        last_enc = False
-        for b in range(BEATS):
-            a = targets[b]
-            bnext = targets[b + 1] if b + 1 < BEATS else nxt_entry
-            enc = density >= 3 and rng.random() < enclose      # obklíčení cíle bnext (2 sloty před ním)
-            if b == BEATS - 1:
-                last_enc = enc
-            for j in range(1, density):
-                slot = b * density + j
-                if enc and j == density - 2:                   # horní soused stupnice
-                    pos[slot] = _enc_upper(sc, bnext)
-                elif enc and j == density - 1:                 # spodní půltón (chromaticky) -> cíl
-                    pos[slot] = bnext - 1
-                elif j == density - 1:                          # jednoduchý approach na cíl
-                    pos[slot] = _approach(bnext, a, sc, rng, approach)
-                else:                                           # stupnicové vyplnění
-                    pos[slot] = _scale_between(sc, a, bnext, j / density)
-        if npb >= 2 and not last_enc:
-            pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, targets[-1]), sc, rng, approach)
+        if motion == "scale":
+            # BĚH PO STUPNICI: krok po kroku v jednom směru -> ukáže CELOU chord-scale
+            si = min(range(len(sc)), key=lambda k: abs(sc[k] - entry))
+            fallback = sc[si]
+            pos, cur, dd = {}, si, d
+            for n in range(npb):
+                cur = max(0, min(len(sc) - 1, cur))
+                pos[n] = sc[cur]
+                nx = cur + dd
+                if nx < 0 or nx >= len(sc):                    # odraz dovnitř stupnice
+                    dd = -dd; nx = cur + dd
+                cur = nx
+            if npb >= 2:                                        # poslední tón = approach do dalšího akordu
+                pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, fallback), sc, rng, approach)
+        else:
+            # CÍLE na doby = akordové arpeggio v jednom směru (odraz od kraje, bez duplikace)
+            ci = min(range(len(ct)), key=lambda k: abs(ct[k] - entry))
+            targets = [ct[ci]]
+            for b in range(1, BEATS):
+                ni = ci + d
+                if ni < 0 or ni >= len(ct):                   # odraz dovnitř rejstříku
+                    d = -d; ni = ci + d
+                ni = max(0, min(len(ct) - 1, ni))
+                targets.append(ct[ni]); ci = ni
+            fallback = targets[0]
+            # POZICE: arpeggio na doby; offbeaty stupnicově spojí / approachnou / OBKLÍČÍ další cíl
+            pos = {b * density: targets[b] for b in range(BEATS)}
+            last_enc = False
+            for b in range(BEATS):
+                a = targets[b]
+                bnext = targets[b + 1] if b + 1 < BEATS else nxt_entry
+                enc = density >= 3 and rng.random() < enclose  # obklíčení cíle bnext (2 sloty před ním)
+                if b == BEATS - 1:
+                    last_enc = enc
+                for j in range(1, density):
+                    slot = b * density + j
+                    if enc and j == density - 2:               # horní soused stupnice
+                        pos[slot] = _enc_upper(sc, bnext)
+                    elif enc and j == density - 1:             # spodní půltón (chromaticky) -> cíl
+                        pos[slot] = bnext - 1
+                    elif j == density - 1:                      # jednoduchý approach na cíl
+                        pos[slot] = _approach(bnext, a, sc, rng, approach)
+                    else:                                       # stupnicové vyplnění
+                        pos[slot] = _scale_between(sc, a, bnext, j / density)
+            if npb >= 2 and not last_enc:
+                pos[npb - 1] = _approach(nxt_entry, pos.get(npb - 2, targets[-1]), sc, rng, approach)
         prev = None
         for n in range(npb):
-            p = pos.get(n, targets[0])
+            p = pos.get(n, fallback)
             if p == prev:                                     # nikdy neopakuj tentýž tón
                 on_beat = (n % density == 0)                  # silná doba -> jiný CHORD tón (zní jako akord);
                 pool = [q for q in (ct if on_beat else sc) if q != p]   # slabá -> jiný tón stupnice (ne chromatika)

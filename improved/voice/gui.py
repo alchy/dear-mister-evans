@@ -37,6 +37,7 @@ class App:
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
         self._draw_state = None                    # (harmony, landings, line) pro překreslení
         self._focus = lessons.LESSONS[0].get("focus")   # fokus aktuální lekce (zvýraznění vrstvy)
+        self._motion = lessons.LESSONS[0].get("motion", "arp")   # pohyb linky (arp/scale) dle lekce
         self._bass_range = (36, 64)                # dynamický rozsah bas klaviatury (z draw)
         self._resize_job = None
         self._loading = False
@@ -201,6 +202,7 @@ class App:
             self.mode.set(p["mode"]); self._refresh_patterns()
         if "pattern" in p: self.pattern.set(p["pattern"])
         self._focus = les.get("focus")               # zvýrazni vrstvu lekce v náhledu
+        self._motion = les.get("motion", "arp")      # arp (drill) vs scale (běh po stupnici)
         self._rebuild()
         self.lesson_title.set(les["title"])
         self.explain.set(les["explain"])
@@ -241,9 +243,10 @@ class App:
         bebop = bool(over.get("bebop", self.bebop.get()))
         color = over.get("color", self.color.get())
         kind = over.get("voicing", self._kind())
+        motion = over.get("motion", self._motion)
         H = Harmony(self.chords.get(), color=color, voicing=kind, bebop=bebop)
         line = build.generate(H, density=density, seed=self.seed.get(), approach=approach,
-                              enclose=enclose)
+                              enclose=enclose, motion=motion)
         _, landings = build.guide_path(H)
         return H, landings, line, density
 
@@ -287,6 +290,7 @@ class App:
                 self.lesson_title.set(les["title"])
                 self.explain.set(les["explain"])
                 self._focus = les.get("focus")
+                self._motion = les.get("motion", "arp")
             self.status.set("Obnoveno z minula.")
         finally:
             self._loading = False

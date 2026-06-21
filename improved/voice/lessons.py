@@ -50,6 +50,7 @@ LESSONS = [
         "preset": {"density": 2, "approach": 0.2, "voicing": "rootless",
                    "root": "C", "mode": "dur", "pattern": "ii–V–I"},
         "focus": "scale",
+        "motion": "scale",
         "ab": None,
     },
     {
@@ -92,6 +93,7 @@ LESSONS = [
         "preset": {"density": 2, "approach": 0.2, "enclose": 0.0, "bebop": True, "voicing": "rootless",
                    "root": "C", "mode": "dur", "pattern": "ii–V–I"},
         "focus": "scale",
+        "motion": "scale",
         "ab": {"A": {"bebop": False}, "B": {"bebop": True}},
     },
     # --- Blok D: levá ruka ---
@@ -136,6 +138,7 @@ LESSONS = [
         "preset": {"density": 2, "approach": 0.3, "color": "dim", "voicing": "rootless",
                    "root": "C", "mode": "dur", "pattern": "ii–V–I"},
         "focus": "scale",
+        "motion": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "dim"}},
     },
 ]
