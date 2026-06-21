@@ -18,6 +18,7 @@ MEL_LO, MEL_HI = 55, 88          # G3..E6 (melodie)
 DOT_BASS = "#1f7ae0"
 DOT_MEL = "#e8731e"
 VL_LINE = "#1f7ae0"
+ROOT_YEL = "#f0c020"        # naznačený (vynechaný) root u rootless voicingu -- žlutě, bez čísla
 _PC = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
@@ -149,16 +150,27 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                      outline="#2a9d3a", width=2, fill="")
         cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
-    # 1) levá ruka: pozice bublin -> čáry voice-leadingu MEZI BUBLINAMI (chromatika LH),
-    #    NE na klávesy. Spojí k-tý hlas akordu i s k-tým hlasem akordu i+1.
-    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass] + sorted(bar.voicing))
-          for i, bar in enumerate(bars)]
+    # 1) levá ruka. Rootless = root jen NAZNAČENÝ (bas) -> žlutě bez čísla; číslují se
+    #    jen reálné tóny voicingu. Rooted = vše číslované ([bas]+voicing).
+    lh_seq = []
+    for bar in bars:
+        voic = sorted(bar.voicing)
+        rootless = (bar.root % 12) not in [p % 12 for p in voic]
+        lh_seq.append((voic if rootless else [bar.bass] + voic, rootless))
+    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, seq)
+          for i, (seq, _) in enumerate(lh_seq)]
+    # čáry voice-leadingu MEZI BUBLINAMI (k-tý hlas akordu i -> k-tý hlas i+1)
     for i in range(n - 1):
         a, b = lh[i], lh[i + 1]
         for k in range(min(len(a), len(b))):
             cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=2)
-    # číslovaná kolečka navrch (LH + melodie)
+    # kolečka navrch: žlutý naznačený root (bez čísla) + číslované voicingy + melodie
     for i, bar in enumerate(bars):
+        seq, rootless = lh_seq[i]
+        if rootless:
+            base = y0_of(i) + g.LBL + g.WH - g.WW * 0.6
+            _dot(cv, _cx(g, 0, g.bass_lo, g.bass_hi, bar.bass), base, g.DOTR,
+                 fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
         if mel:
             _dots(cv, g, _seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]), DOT_MEL)
