@@ -38,8 +38,20 @@ class App:
         self._build()
 
     def _build(self):
-        f = ttk.Frame(self.root, padding=10)
-        f.grid(sticky="nsew")
+        # dvoupanelový layout: VLEVO settings, VPRAVO klaviatura/náhled
+        outer = ttk.Frame(self.root, padding=10)
+        outer.grid(sticky="nsew")
+        left = ttk.Frame(outer)
+        left.grid(row=0, column=0, sticky="n")
+        ttk.Separator(outer, orient="vertical").grid(row=0, column=1, sticky="ns", padx=10)
+        right = ttk.LabelFrame(
+            outer, padding=4,
+            text="Náhled: ● levá ruka (přesun) · ● tóny stupnice · ◯ guide (3/7) · ▼ landing · — co hraje")
+        right.grid(row=0, column=2, sticky="n")
+        self._controls(left)
+        self._preview(right)
+
+    def _controls(self, f):
         pad = {"padx": 5, "pady": 4}
         r = 0
         names = mido.get_output_names() or [""]
@@ -58,10 +70,10 @@ class App:
 
         ttk.Label(f, text="Akordy:").grid(row=r, column=0, sticky="w", **pad)
         self.chords = tk.StringVar(value=TEMPLATES["ii–V–I dur (C)"])
-        ttk.Entry(f, textvariable=self.chords, width=40).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
+        ttk.Entry(f, textvariable=self.chords, width=28).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
         r += 1
 
-        ttk.Label(f, text="Hustota (not/dobu):").grid(row=r, column=0, sticky="w", **pad)
+        ttk.Label(f, text="Hustota:").grid(row=r, column=0, sticky="w", **pad)
         self.density = tk.IntVar(value=2)
         ttk.Spinbox(f, from_=1, to=4, textvariable=self.density, width=5).grid(row=r, column=1, sticky="w", **pad)
         ttk.Label(f, text="BPM:").grid(row=r, column=2, sticky="e", **pad)
@@ -91,17 +103,16 @@ class App:
         ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3)
         r += 1
 
-        self.status = tk.StringVar(value="Připraveno. (builder cíl+spojka — guide tóny → bebop/approach)")
-        ttk.Label(f, textvariable=self.status, foreground="#246", width=52, anchor="w").grid(
-            row=r, column=0, columnspan=4, sticky="w", **pad)
-        r += 1
-        # anotovaný náhled (tabule): LH+voice-leading · tóny stupnice · landing
-        prev = ttk.LabelFrame(f, text="Náhled: ● levá ruka (přesun) · ● tóny stupnice · ◯ guide (3/7) · ▼ landing", padding=4)
-        prev.grid(row=r, column=0, columnspan=4, sticky="we", **pad)
-        self.canvas = tk.Canvas(prev, width=620, height=320, bg="#fafafa", highlightthickness=0)
-        sb = ttk.Scrollbar(prev, orient="vertical", command=self.canvas.yview)
+        self.status = tk.StringVar(value="Připraveno. (builder cíl+spojka)")
+        ttk.Label(f, textvariable=self.status, foreground="#246", width=34, anchor="w",
+                  wraplength=260).grid(row=r, column=0, columnspan=4, sticky="w", **pad)
+
+    def _preview(self, f):
+        self.canvas = tk.Canvas(f, width=560, height=540, bg="#fafafa", highlightthickness=0)
+        sb = ttk.Scrollbar(f, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=sb.set)
-        self.canvas.grid(row=0, column=0, sticky="nsew"); sb.grid(row=0, column=1, sticky="ns")
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        sb.grid(row=0, column=1, sticky="ns")
 
     def refresh_ports(self):
         names = mido.get_output_names() or [""]
