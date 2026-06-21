@@ -1,0 +1,21 @@
+{
+  "_comment": "Jazzové standardy k procvičení nad reálnými změnami. Rozšiřuj přidáním položek: name (název), key (tónina, info), changes (akordy oddělené mezerou, 1 akord = 1 takt). Kvality: maj7 m7 7 6 m6 m7b5 dim7 mmaj7.",
+  "standards": [
+    { "name": "Autumn Leaves (A)", "key": "Gm",
+      "changes": "Cm7 F7 Bbmaj7 Ebmaj7 Am7b5 D7 Gm7 Gm7" },
+    { "name": "Blue Bossa", "key": "Cm",
+      "changes": "Cm7 Cm7 Fm7 Fm7 Dm7b5 G7 Cm7 Cm7 Ebm7 Ab7 Dbmaj7 Dbmaj7 Dm7b5 G7 Cm7 Cm7" },
+    { "name": "Take the A Train (A)", "key": "C",
+      "changes": "Cmaj7 Cmaj7 D7 D7 Dm7 G7 Cmaj7 Cmaj7" },
+    { "name": "Tune Up", "key": "D",
+      "changes": "Em7 A7 Dmaj7 Dmaj7 Dm7 G7 Cmaj7 Cmaj7 Cm7 F7 Bbmaj7 Bbmaj7" },
+    { "name": "Lady Bird", "key": "C",
+      "changes": "Cmaj7 Cmaj7 Fm7 Bb7 Cmaj7 Cmaj7 Bbm7 Eb7 Abmaj7 Abmaj7 Am7 D7 Dm7 G7 Cmaj7 Cmaj7" },
+    { "name": "All of Me (A)", "key": "C",
+      "changes": "Cmaj7 Cmaj7 E7 E7 A7 A7 Dm7 Dm7 E7 E7 Am7 Am7 D7 D7 Dm7 G7" },
+    { "name": "Fly Me to the Moon", "key": "C",
+      "changes": "Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Am7" },
+    { "name": "So What (modal)", "key": "Dm",
+      "changes": "Dm7 Dm7 Dm7 Dm7 Ebm7 Ebm7 Dm7 Dm7" }
+  ]
+}

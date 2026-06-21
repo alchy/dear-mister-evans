@@ -15,7 +15,7 @@ import mido
 
 from voice.harmony import Harmony
 from voice.render import to_midi
-from voice import build, view, progressions as prog, voicings as voi, lessons
+from voice import build, view, progressions as prog, voicings as voi, lessons, tunes
 
 
 def default_port(names):
@@ -264,6 +264,21 @@ class App:
             for w in widgets:
                 w.state(st)
 
+    def apply_standard(self, std):
+        """Nastav progresi konkrétní SKLADBY (device aktuální lekce hraje nad reálnými
+        změnami). Tónika transponuje; Tonalita/Postup se zaghostí (stavebnice nesedí)."""
+        ch = std["changes"]
+        self._lesson_chords = ch
+        self._lesson_root_pc = self._first_root_pc(ch)
+        self.root_note.set(prog.NAMES[self._lesson_root_pc])
+        self.chords.set(ch)
+        for nm in ("mode", "pattern"):
+            for w in self._lockable[nm]:
+                w.state(["disabled"])
+        for w in self._lockable["root"]:
+            w.state(["!disabled"])
+        self.status.set(f"Skladba: {std['name']} ({std.get('key', '')})")
+
     def on_ab(self):
         les = lessons.by_title(self.lesson.get())
         if not les.get("ab"):
@@ -503,6 +518,16 @@ class App:
                                     variable=self.lesson, command=self.apply_lesson)
             les_menu.add_cascade(label=name, menu=sub)
         m.add_cascade(label="Lekce", menu=les_menu)
+        # --- Skladby: standardy ze standards.json (cvič device nad reálnými změnami) ---
+        tn_menu = tk.Menu(m, tearoff=0)
+        stds = tunes.load()
+        if stds:
+            for std in stds:
+                tn_menu.add_command(label=f"{std['name']}  ({std.get('key','')})",
+                                    command=lambda s=std: self.apply_standard(s))
+        else:
+            tn_menu.add_command(label="(žádné standardy)", state="disabled")
+        m.add_cascade(label="Skladby", menu=tn_menu)
         play = tk.Menu(m, tearoff=0)
         self.port_menu = tk.Menu(play, tearoff=0)
         self._fill_ports()
