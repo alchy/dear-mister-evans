@@ -13,9 +13,9 @@ LESSONS = [
         "key": "guide_tones",
         "title": "1 · Guide tóny (3 a 7)",
         "explain": ("3. a 7. stupeň DEFINUJÍ kvalitu akordu (dur/moll/dominanta) — jsou to "
-                    "guide tóny. Veď je plynule krokem přes akordy a DOSEDEJ na ně; melodie "
-                    "pak obkresluje harmonii i bez plného akordu. Cvičení: čtvrtky, bez "
-                    "chromatiky, landing na 3/7. Sleduj zelené kroužky a ▼."),
+                    "guide tóny (zelené kroužky). Dosednutí = melodie přijde na guide tón "
+                    "na 1. DOBĚ DALŠÍHO akordu: ▼ ukazuje cíl a červená spojnice vede k 1. "
+                    "notě dalšího taktu (tj. landing je ZAČÁTEK další skupiny, ne konec téhle)."),
         "preset": {"density": 1, "approach": 0.0, "voicing": "rootless",
                    "root": "C", "mode": "dur", "pattern": "ii–V–I"},
         "focus": "guides",
@@ -52,8 +52,9 @@ LESSONS = [
     {
         "key": "landing",
         "title": "5 · Landing do dalšího akordu",
-        "explain": ("Konec taktu miř na 3 nebo 7 DALŠÍHO akordu (▼). Tím se přechody spojí "
-                    "a linka teče přes celou progresi (anticipace na konci taktu)."),
+        "explain": ("Konec taktu (approach) směřuje na 3/7 DALŠÍHO akordu; DOSEDNE se na "
+                    "1. době dalšího taktu — ▼ ukazuje cíl, červená spojnice vede k 1. notě "
+                    "dalšího taktu. Tím se přechody spojí a linka teče přes celou progresi."),
         "preset": {"density": 2, "approach": 0.6, "voicing": "rootless"},
         "focus": "landing",
         "ab": None,

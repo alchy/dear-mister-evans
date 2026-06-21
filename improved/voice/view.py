@@ -169,13 +169,24 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
         a, b = lh[i], lh[i + 1]
         for k in range(min(len(a), len(b))):
             cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=2)
+    # melodie: pozice koleček (spočti jednou -> pro spojnici i kreslení)
+    mel_pos = [_seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]) if mel else []
+               for i in range(n)]
+    # LANDING-spojnice: ▼ taktu i -> PRVNÍ kolečko taktu i+1 (kam se dosedne v dalším akordu)
+    if mel:
+        for i in range(n - 1):
+            if mel_pos[i + 1]:
+                vx = _cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i])
+                vy = y0_of(i) + g.LBL - 1
+                nx, ny = mel_pos[i + 1][0]
+                cv.create_line(vx, vy, nx, ny, fill="#e23030", width=1, dash=(3, 2))
     # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
         bx, by = _seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
         _dot(cv, bx, by, g.DOTR, fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
-        if mel:
-            _dots(cv, g, _seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]), DOT_MEL)
+        if mel_pos[i]:
+            _dots(cv, g, mel_pos[i], DOT_MEL)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
     return (blo, bhi)                                        # bas-rozsah pro hit/set_playing
