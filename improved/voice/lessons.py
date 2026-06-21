@@ -142,6 +142,18 @@ LESSONS = [
         "motion": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "dim"}},
     },
+    {
+        "key": "whole_tone_dom",
+        "title": "13 · Whole-tone (celotónová) na dominantě",
+        "explain": ("6-tónová stupnice ze samých CELÝCH tónů (W–W–W–W–W–W). Od G: G A B C♯ D♯ F "
+                    "= 1 9 3 ♯11 ♯5 ♭7 → barva 7♯5. Symetrická: existují jen 2 různé. Tady přes "
+                    "řetěz dominant. A/B: běžná dominanta (A) vs whole-tone (B)."),
+        "preset": {"density": 2, "approach": 0.2, "color": "wt", "voicing": "rootless",
+                   "chords": "A7 D7 G7 C7"},
+        "focus": "scale",
+        "motion": "scale",
+        "ab": {"A": {"color": "inside"}, "B": {"color": "wt"}},
+    },
 ]
 
 
@@ -152,7 +164,7 @@ BLOCKS = [
     ("C · Ozdoby", ["approach", "enclosure", "bebop_scale"]),
     ("D · Levá ruka", ["voice_leading", "voicing_textures"]),
     ("E · Moll", ["minor_ii_v_i"]),
-    ("F · Barevné stupnice", ["diminished_dom"]),
+    ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom"]),
 ]
 
 

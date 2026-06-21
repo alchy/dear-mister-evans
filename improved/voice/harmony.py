@@ -33,6 +33,7 @@ SCALES = {
     "dim_wh": [0, 2, 3, 5, 6, 8, 9, 11], "dim_hw": [0, 1, 3, 4, 6, 7, 9, 10],
     "bebop_dom": [0, 2, 4, 5, 7, 9, 10, 11], "bebop_maj": [0, 2, 4, 5, 7, 8, 9, 11],
     "bebop_dorian": [0, 2, 3, 5, 7, 9, 10, 11],   # dórská + velká septima (průchod b7->1)
+    "whole_tone": [0, 2, 4, 6, 8, 10],            # celotónová (6 tónů, symetrická) -> 7#5/7b5
 }
 # bebopová varianta chord-scale dle kvality (přidaný chromatický PRŮCHOD -> akord. tóny na těžkou)
 BEBOP = {"maj7": "bebop_maj", "6": "bebop_maj", "7": "bebop_dom",
@@ -65,6 +66,8 @@ def scale_name_for(q, resolves_to_minor=False, color="inside"):
     if q == "7":
         if color == "dim":                              # půltón-celý diminished (7b9: b9 #9 #11 13)
             return "dim_hw"
+        if color == "wt":                               # celotónová (7#5: 9 3 #11 #5 b7)
+            return "whole_tone"
         if resolves_to_minor:
             return "altered" if color == "outside" else "phrygian_dom"
         return "bebop_dom" if color == "inside" else "lydian_dom"
