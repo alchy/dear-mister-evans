@@ -105,6 +105,18 @@ def _dot(cv, x, y, r, **kw):
     cv.create_oval(x - r, y - r, x + r, y + r, **kw)
 
 
+def _bass_pos(g, x0, ky, lo, hi, seq):
+    """BAS blok: jiná technika než melodie -- BEZ schodiště/levelů. Drží tóny: kolečko
+    na BÍLÉ klávese je vždy v ZÁKLADNÍM horizontu, na ČERNÉ klávese VÝŠ (položené na
+    černou klapku). Dva horizonty (bílá/černá), ne narůstající patra."""
+    base = ky + g.WH - g.WW * 0.6
+    out = []
+    for p in seq:
+        black = (p % 12) in BLACK
+        out.append((_cx(g, x0, lo, hi, p), base - (g.STEP if black else 0)))
+    return out
+
+
 def _seq_pos(g, x0, ky, lo, hi, seq):
     """Pozice (cx,cy) bublin v pořadí hraní -- dráhové schodiště. Řada (level) jde
     JEN NAHORU (monotónně): patro výš při opakování/změně směru A při přechodu
@@ -193,7 +205,7 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False, focus=None):
                        text=f"{_PC[landings[i] % 12]} ({deg}·{_sym(nxt)})",
                        fill=ld_col, font=("Segoe UI", g.flbl, "bold"))
     # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
-    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
+    lh = [_bass_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
           for i, bar in enumerate(bars)]
     # čáry voice-leadingu MEZI BUBLINAMI voicingu (k-tý hlas akordu i -> k-tý hlas i+1):
     # DRŽENÝ společný tón (stejná nota) = SVĚTLE; skutečný PŘESUN na jinou notu = plná barva.
@@ -219,7 +231,7 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False, focus=None):
                                arrow="last")
     # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
-        bx, by = _seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
+        bx, by = _bass_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
         _dot(cv, bx, by, g.DOTR, fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
         if mel_pos[i]:
