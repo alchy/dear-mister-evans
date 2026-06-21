@@ -15,7 +15,7 @@ import mido
 
 from voice.harmony import Harmony
 from voice.render import to_midi
-from voice import build, view, progressions as prog, voicings as voi
+from voice import build, view, progressions as prog, voicings as voi, lessons
 
 
 def default_port(names):
@@ -58,9 +58,20 @@ class App:
 
     def _controls(self, f):
         pad = {"padx": 4, "pady": 3}
+        # === Lekce (virtuální Levine) ===
+        gl = ttk.LabelFrame(f, text="Lekce", padding=6)
+        gl.grid(row=0, column=0, sticky="we", pady=(0, 8))
+        self.lesson = tk.StringVar(value=lessons.titles()[0])
+        ttk.OptionMenu(gl, self.lesson, self.lesson.get(), *lessons.titles(),
+                       command=self.apply_lesson).grid(row=0, column=0, sticky="we", **pad)
+        ttk.Button(gl, text="▶ A/B (slyš rozdíl)", command=self.on_ab).grid(row=0, column=1, **pad)
+        self.explain = tk.StringVar(value=lessons.LESSONS[0]["explain"])
+        ttk.Label(gl, textvariable=self.explain, foreground="#345", anchor="w", justify="left",
+                  wraplength=320).grid(row=1, column=0, columnspan=2, sticky="we", **pad)
+
         # === Progrese — stavebnice cvičení ===
         g = ttk.LabelFrame(f, text="Progrese — stavebnice cvičení", padding=6)
-        g.grid(row=0, column=0, sticky="we", pady=(0, 8))
+        g.grid(row=1, column=0, sticky="we", pady=(0, 8))
         ttk.Label(g, text="Tónika:").grid(row=0, column=0, sticky="w", **pad)
         self.root_note = tk.StringVar(value="C")
         ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES,
@@ -80,7 +91,7 @@ class App:
 
         # === Cvičení (generování) ===
         g2 = ttk.LabelFrame(f, text="Cvičení", padding=6)
-        g2.grid(row=1, column=0, sticky="we", pady=(0, 8))
+        g2.grid(row=2, column=0, sticky="we", pady=(0, 8))
         ttk.Label(g2, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
         self.density = tk.IntVar(value=2)
         ttk.Spinbox(g2, from_=1, to=4, textvariable=self.density, width=5).grid(row=0, column=1, sticky="w", **pad)
@@ -104,7 +115,7 @@ class App:
 
         # === Přehrávání ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
-        g3.grid(row=2, column=0, sticky="we")
+        g3.grid(row=3, column=0, sticky="we")
         ttk.Label(g3, text="MIDI port:").grid(row=0, column=0, sticky="w", **pad)
         names = mido.get_output_names() or [""]
         self.port = tk.StringVar(value=default_port(names))
@@ -118,11 +129,11 @@ class App:
 
         self.flip = tk.BooleanVar(value=False)
         ttk.Checkbutton(f, text="obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
-                        command=self._redraw).grid(row=3, column=0, sticky="w", pady=(6, 0))
+                        command=self._redraw).grid(row=4, column=0, sticky="w", pady=(6, 0))
 
         self.status = tk.StringVar(value="Připraveno. (klik na klávesy = přehraj: vlevo akord, vpravo linka)")
         ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
-                  wraplength=300).grid(row=4, column=0, sticky="we", pady=(6, 0))
+                  wraplength=300).grid(row=5, column=0, sticky="we", pady=(6, 0))
 
     def _preview(self, f):
         self.canvas = tk.Canvas(f, width=820, height=680, bg="#fafafa", highlightthickness=0)
@@ -134,18 +145,75 @@ class App:
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.canvas.bind("<Button-1>", self.on_kbd_click)    # klik na klávesy = přehraj blok
 
-    def _on_mode(self):
-        pats = prog.patterns(self.mode.get())                 # přepiš nabídku postupů dle tonality
+    def _refresh_patterns(self):
+        pats = prog.patterns(self.mode.get())                 # nabídka postupů dle tonality
         m = self.pattern_menu["menu"]; m.delete(0, "end")
         for p in pats:
             m.add_command(label=p, command=lambda v=p: (self.pattern.set(v), self._rebuild()))
         if self.pattern.get() not in pats:
             self.pattern.set(pats[0])
+
+    def _on_mode(self):
+        self._refresh_patterns()
         self._rebuild()
 
     def _rebuild(self):
         self.chords.set(prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
         self.status.set(f"Postup: {self.root_note.get()} {self.mode.get()} · {self.pattern.get()}")
+
+    # ---------- lekce (preset + výklad + A/B) ----------
+    def apply_lesson(self, _title=None):
+        les = lessons.by_title(self.lesson.get())
+        p = les.get("preset", {})
+        if "density" in p: self.density.set(p["density"])
+        if "approach" in p: self.approach.set(p["approach"])
+        if "color" in p: self.color.set(p["color"])
+        if p.get("voicing") in voi.LABELS: self.voicing.set(voi.LABELS[p["voicing"]])
+        if "root" in p: self.root_note.set(p["root"])
+        if "mode" in p:
+            self.mode.set(p["mode"]); self._refresh_patterns()
+        if "pattern" in p: self.pattern.set(p["pattern"])
+        self._rebuild()
+        self.explain.set(les["explain"])
+        self.status.set(f"Lekce: {les['title']}")
+
+    def on_ab(self):
+        les = lessons.by_title(self.lesson.get())
+        if not les.get("ab"):
+            self.status.set("Tato lekce nemá A/B."); return
+        self._start(lambda: self._work_ab(les["ab"]))
+
+    def _work_ab(self, ab):
+        import time
+        try:
+            for tag in ("A", "B"):
+                if self.stop.is_set():
+                    break
+                H, landings, line, density = self._gen(**ab[tag])
+                to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density)
+                self._draw_state = (H, landings, line)
+                self.root.after(0, self._redraw)
+                self.status.set(f"A/B — {tag}: {ab[tag]}")
+                self._with_port(lambda out: self._send_follow(out, self.preview, len(H)))
+                time.sleep(0.5)
+        except Exception as e:
+            traceback.print_exc(); self.status.set(f"Chyba: {e}")
+        finally:
+            self.root.after(0, lambda: self._set_playing(None))
+
+    def _kind(self):
+        return {v: k for k, v in voi.LABELS.items()}.get(self.voicing.get(), "rootless")
+
+    def _gen(self, **over):
+        """Vygeneruj s případnými přepisy parametrů (pro A/B) -> (H, landings, line, density)."""
+        density = int(over.get("density", self.density.get()))
+        approach = float(over.get("approach", self.approach.get()))
+        color = over.get("color", self.color.get())
+        kind = over.get("voicing", self._kind())
+        H = Harmony(self.chords.get(), color=color, voicing=kind)
+        line = build.generate(H, density=density, seed=self.seed.get(), approach=approach)
+        _, landings = build.guide_path(H)
+        return H, landings, line, density
 
     def _on_canvas_resize(self, event):
         if self._draw_state is None:
@@ -256,12 +324,8 @@ class App:
     def _work_generate(self):
         try:
             self.status.set("Generuji…")
-            kind = {v: k for k, v in voi.LABELS.items()}.get(self.voicing.get(), "rootless")
-            H = Harmony(self.chords.get(), color=self.color.get(), voicing=kind)
-            line = build.generate(H, density=self.density.get(),
-                                  seed=self.seed.get(), approach=self.approach.get())
-            _, landings = build.guide_path(H)
-            to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
+            H, landings, line, density = self._gen()
+            to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density)
             self._draw_state = (H, landings, line)             # ulož pro responzivní překreslení
             self.root.after(0, self._redraw)
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
