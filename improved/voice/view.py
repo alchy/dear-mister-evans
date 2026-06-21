@@ -37,12 +37,12 @@ def _geom(width):
     g.COL_GAP = ww * 1.8
     g.DOTR = max(6.0, ww * 0.46)
     g.STEP = ww * 0.74
-    g.LBL = 14
+    g.LBL = 16                                       # pevné pásmo popisku (font neškáluje)
     g.GAP = ww * 0.85
     g.ROW_H = g.LBL + g.WH + g.GAP
     g.mel_x0 = bw * ww + g.COL_GAP
-    g.fnum = max(7, int(ww * 0.5))
-    g.flbl = max(8, int(ww * 0.42))
+    g.fnum = max(7, int(ww * 0.5))                   # čísla koleček škálují s klávesami
+    g.flbl = 9                                       # popisek akord·stupnice = PEVNÝ font (nepřekrývá)
     return g
 
 
