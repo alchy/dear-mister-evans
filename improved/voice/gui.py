@@ -39,6 +39,8 @@ class App:
         self._focus = lessons.LESSONS[0].get("focus")   # fokus aktuální lekce (zvýraznění vrstvy)
         self._motion = lessons.LESSONS[0].get("motion", "arp")   # pohyb linky (arp/scale) dle lekce
         self._scale_ov = lessons.LESSONS[0].get("preset", {}).get("scale")   # override stupnice (blues/pent)
+        self._lesson_chords = None                 # šablona progrese lekce (pro transpozici Tónikou)
+        self._lesson_root_pc = 0
         self._bass_range = (36, 64)                # dynamický rozsah bas klaviatury (z draw)
         self._resize_job = None
         self._loading = False
@@ -101,7 +103,7 @@ class App:
         g.grid(row=1, column=0, sticky="we", pady=(0, 8))
         lbl_root = ttk.Label(g, text="Tónika:"); lbl_root.grid(row=0, column=0, sticky="w", **pad)
         self.root_note = tk.StringVar(value="C")
-        m_root = ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES, command=lambda *_: self._rebuild())
+        m_root = ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES, command=lambda *_: self._on_root_change())
         m_root.grid(row=0, column=1, sticky="we", **pad)
         lbl_mode = ttk.Label(g, text="Tonalita:"); lbl_mode.grid(row=0, column=2, sticky="e", **pad)
         self.mode = tk.StringVar(value="dur")
@@ -191,6 +193,39 @@ class App:
         self.chords.set(prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
         self.status.set(f"Postup: {self.root_note.get()} {self.mode.get()} · {self.pattern.get()}")
 
+    _NOTE_PC = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
+    def _root_pc(self, name):
+        pc = self._NOTE_PC.get(name[:1], 0)
+        for ch in name[1:]:
+            pc += 1 if ch == "#" else -1 if ch == "b" else 0
+        return pc % 12
+
+    def _first_root_pc(self, chords):
+        tok = chords.split()[0]
+        i = 1
+        while i < len(tok) and tok[i] in "#b":
+            i += 1
+        return self._root_pc(tok[:i])
+
+    def _transpose(self, chords, delta):
+        out = []
+        for tok in chords.split():
+            i = 1
+            while i < len(tok) and tok[i] in "#b":
+                i += 1
+            out.append(prog.NAMES[(self._root_pc(tok[:i]) + delta) % 12] + tok[i:])
+        return " ".join(out)
+
+    def _on_root_change(self):
+        """Změna Tóniky: u lekce s pevnou progresí TRANSPONUJ šablonu; jinak přestav ze stavebnice."""
+        if self._lesson_chords:
+            delta = self._root_pc(self.root_note.get()) - self._lesson_root_pc
+            self.chords.set(self._transpose(self._lesson_chords, delta))
+            self.status.set(f"Transpozice do {self.root_note.get()}")
+        else:
+            self._rebuild()
+
     # ---------- lekce (preset + výklad + A/B) ----------
     def apply_lesson(self, _title=None):
         les = lessons.by_title(self.lesson.get())
@@ -211,8 +246,12 @@ class App:
         self._motion = les.get("motion", "arp")      # arp (drill) vs scale (běh po stupnici)
         self._scale_ov = p.get("scale")              # override stupnice přes celé changes (blues/pent)
         if "chords" in p:
-            self.chords.set(p["chords"])             # explicitní progrese (přebije stavebnici)
+            self._lesson_chords = p["chords"]        # šablona -> Tónika ji transponuje (klíč není zamčený)
+            self._lesson_root_pc = self._first_root_pc(p["chords"])
+            self.root_note.set(prog.NAMES[self._lesson_root_pc])
+            self.chords.set(p["chords"])
         else:
+            self._lesson_chords = None
             self._rebuild()
         self._set_locks(les, p)                       # zaghostí ovladače, co lekce nepotřebuje
         self.lesson_title.set(les["title"])
@@ -224,8 +263,8 @@ class App:
         (preset 'chords') -> Tónika/Tonalita/Postup jsou bez efektu. Lekce může navíc
         vyjmenovat 'lock': [...] (root/mode/pattern)."""
         locked = set(les.get("lock", []))
-        if "chords" in p:                                # explicitní progrese -> stavebnice bez efektu
-            locked |= {"root", "mode", "pattern"}
+        if "chords" in p:                                # pevná progrese: Tónika TRANSPONUJE (nezamykat),
+            locked |= {"mode", "pattern"}                # ale Tonalita/Postup (stavebnice) nesedí -> zamknout
         for name, widgets in self._lockable.items():
             st = ["disabled"] if name in locked else ["!disabled"]
             for w in widgets:
@@ -313,10 +352,14 @@ class App:
                 self.lesson.set(les["title"])          # normalizuj (po přečíslování titulů)
                 self.lesson_title.set(les["title"])
                 self.explain.set(les["explain"])
+                pr = les.get("preset", {})
                 self._focus = les.get("focus")
                 self._motion = les.get("motion", "arp")
-                self._scale_ov = les.get("preset", {}).get("scale")
-                self._set_locks(les, les.get("preset", {}))
+                self._scale_ov = pr.get("scale")
+                self._lesson_chords = pr.get("chords")
+                if self._lesson_chords:
+                    self._lesson_root_pc = self._first_root_pc(self._lesson_chords)
+                self._set_locks(les, pr)
             self.status.set("Obnoveno z minula.")
         finally:
             self._loading = False
