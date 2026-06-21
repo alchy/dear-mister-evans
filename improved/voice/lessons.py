@@ -132,11 +132,12 @@ LESSONS = [
     {
         "key": "diminished_dom",
         "title": "12 · Diminished na dominantě (půltón-celý)",
-        "explain": ("Symetrická 8-tónová stupnice (H–W–H–W) na dominantě dá barvu 7♭9: "
-                    "♭9 ♯9 ♯11 13. Opakuje se po malé tercii (4 stejné útvary) → snadné "
-                    "transpozice patternů. Paleta ukáže 8 tónů. A/B: mixo/bebop (A) vs diminished (B)."),
-        "preset": {"density": 2, "approach": 0.3, "color": "dim", "voicing": "rootless",
-                   "root": "C", "mode": "dur", "pattern": "ii–V–I"},
+        "explain": ("Symetrická 8-tónová stupnice na DOMINANTĚ: střídá půltón–celý (H–W–H–W). "
+                    "Od G: G A♭ B♭ B C♯ D E F = 1 ♭9 ♯9 3 ♯11 5 13 ♭7. Opakuje se po malé tercii "
+                    "(jen 3 různé). Tady běží přes ŘETĚZ DOMINANT — každý takt je diminished. "
+                    "A/B: běžná dominanta (A) vs diminished (B)."),
+        "preset": {"density": 2, "approach": 0.2, "color": "dim", "voicing": "rootless",
+                   "chords": "A7 D7 G7 C7"},
         "focus": "scale",
         "motion": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "dim"}},

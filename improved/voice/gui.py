@@ -203,7 +203,10 @@ class App:
         if "pattern" in p: self.pattern.set(p["pattern"])
         self._focus = les.get("focus")               # zvýrazni vrstvu lekce v náhledu
         self._motion = les.get("motion", "arp")      # arp (drill) vs scale (běh po stupnici)
-        self._rebuild()
+        if "chords" in p:
+            self.chords.set(p["chords"])             # explicitní progrese (přebije stavebnici)
+        else:
+            self._rebuild()
         self.lesson_title.set(les["title"])
         self.explain.set(les["explain"])
         self.status.set(f"Lekce: {les['title']}")
