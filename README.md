@@ -1,15 +1,23 @@
 # dear-mister-evans
 
-> Z libovolného MIDI vyrob zjednodušenou **Evansovskou** verzi skladby —
-> barevné rootless voicingy s vedením hlasů + melodie postavená na harmonii.
-> Nástroj pro **učení jazzového piana**.
->
-> *Turn any MIDI into a simplified Bill-Evans-style arrangement: rootless
-> voicings with voice-leading + a melody built on top of the harmony.*
+> Nástroje pro **učení jazzového piana** postavené na harmonii a vedení hlasů.
+> *Tools for learning jazz piano, grounded in harmony and voice-leading.*
+
+Repo má **dvě části**:
+
+1. **`improved/voice/` — virtuální Mark Levine (AKTUÁLNÍ směr)** 🎓
+   Interaktivní výukový software: koncept *vysvětli → předveď → A/B*, s anotovaným
+   klaviaturním náhledem. Teorie (chord-scales, guide tóny, voice-leading, bebop
+   devices) tě vede do rukou. **→ [improved/voice/README.md](improved/voice/README.md)**
+   ```bash
+   python improved/voice/gui.py
+   ```
+2. **Aranžér + syntezátor cvičení (prototyp, níže)** — z libovolného MIDI vyrob
+   zjednodušenou Evansovskou aranž; generátor progresí a cvičebnice stupnic.
 
 ---
 
-## O co jde
+## Aranžér: o co jde
 
 Cílem je vzít jakoukoliv skladbu (MIDI) a vyrobit z ní **zjednodušenou podobu
 k učení** ve stylu Billa Evanse — ne virtuózní transkripci, ale čistou kostru:

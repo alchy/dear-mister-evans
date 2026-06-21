@@ -81,11 +81,15 @@ Plus **textový výklad Levina** vedle a tlačítka A/B přehrání.
   koncept toggly, call-and-response, feedback. (~5 generativních os zůstává jako „pokročilé".)
 
 ## 8. Fáze implementace (na kostře)
-② harmonie kontextově (chord-scales dle funkce, avoid notes, guide).
-③ builder cíl+spojka (skeleton guide tónů → fill connectory) + Evans vkus + anotace.
-④ `lessons.py`: 3–4 první lekce (guide tones, bebop/chord-tóny-na-těžké, approach, ii-V-I)
-   = text + izolační parametry + anotace.
-⑤ GUI-tabule: výklad + anotovaný náhled + A/B + toggly + feedback. Postupně přidávat lekce.
+② harmonie kontextově (chord-scales dle funkce, guide). ✅
+③ builder cíl+spojka (skeleton guide tónů → fill connectory) + anotace. ✅ (Evans vkus zatím ne)
+④ `lessons.py`: lekce = text + izolační parametry + anotace. ✅ **11 lekcí** (bloky A–E)
+⑤ GUI-tabule: výklad + anotovaný náhled + A/B + focus. ✅ (feedback OPUŠTĚN — teorie-first)
+
+**Stav 2026-06-21 (mergeno do main):** harmonie+voicingy (9 typů vč. cluster I/II/III),
+builder s enclosure + bebop stupnicí (žádná chromatika na těžkou), 11 lekcí + focus
+zvýraznění, landing popisek 3/7, fialová chromatika. GUI: sylabus po blocích, port/tempo/
+flip/pokročilé v menu. **Dál:** blok F (prostor/swing/motiv), avoid-note, reálné standardy.
 
 ## 9. Co zůstává z dohod
 Jeden koherentní hlas, málo os, feedback = volný drift (teď i jako *výuka*). Scale-degree
