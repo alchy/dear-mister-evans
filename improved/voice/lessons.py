@@ -182,16 +182,28 @@ LESSONS = [
     # --- Blok H: běhy / licky ---
     {
         "key": "thirds_run",
-        "title": "16 · Sestupné tercie (run dolů)",
-        "explain": ("Restart VYSOKO u každého akordu a klesej po TERCIÍCH. Nad moll diatonické "
-                    "tercie (Am7: D B G E…), nad dominantou s whole-tone barvou augmentované "
-                    "tercie (D7: D A♯ F♯ = D+). Z reálné ukázky (triplets-in-four). "
-                    "A/B: rovný běh (A) vs tercie (B)."),
+        "title": "16 · Tercie po 4 — dolů",
+        "explain": ("Běh v TERCIÍCH (interval mezi tóny) ve skupinách po 4 (buňka). Sjedeš 4 tóny "
+                    "dolů po terciích, skok zpět nahoru a další buňka o krok níž (kaskáda dolů). "
+                    "Nad moll diatonické (Am7: D B G E), nad whole-tone dominantou augmentované "
+                    "(D7: D A♯ F♯). Hustota řídí délku běhu. A/B: rovný běh (A) vs tercie (B)."),
         "preset": {"density": 2, "approach": 0.0, "color": "wt", "voicing": "rootless",
                    "chords": "Am7 D7 Gm7 Gm7"},
         "focus": "scale",
         "motion": "thirds_down",
         "ab": {"A": {"motion": "scale"}, "B": {"motion": "thirds_down"}},
+    },
+    {
+        "key": "thirds_run_up",
+        "title": "17 · Tercie po 4 — nahoru",
+        "explain": ("Stejná šablona, opačný směr: 4 tóny NAHORU po terciích, skok dolů a další "
+                    "buňka o krok výš (kaskáda nahoru). Nad moll diatonické (Am7: A C E G), nad "
+                    "whole-tone dominantou augmentované. Hustota řídí délku. A/B: rovný běh vs tercie."),
+        "preset": {"density": 2, "approach": 0.0, "color": "wt", "voicing": "rootless",
+                   "chords": "Am7 D7 Gm7 Gm7"},
+        "focus": "scale",
+        "motion": "thirds_up",
+        "ab": {"A": {"motion": "scale"}, "B": {"motion": "thirds_up"}},
     },
 ]
 

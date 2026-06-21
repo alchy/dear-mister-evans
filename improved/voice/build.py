@@ -107,21 +107,23 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
                 if nx < 0 or nx >= len(sc):                    # odraz dovnitř stupnice
                     dd = -dd; nx = cur + dd
                 cur = nx
-        elif motion == "thirds_down":
-            # SESTUPNÉ TERCIE: restart VYSOKO u každého akordu, klesej po terciích (-2 indexy
-            # ve stupnici). Nad dominantou s barvou 'wt' vyjdou augmentované (celotónové) tercie.
-            ceiling = harmony.center + 3
-            cand = [k for k in range(len(sc)) if sc[k] <= ceiling]
-            si = cand[-1] if cand else len(sc) - 1
+        elif motion in ("thirds_down", "thirds_up"):
+            # TERCIE PO 4-TÓNOVÝCH BUŇKÁCH: každá buňka = 4 tóny po terciích; po 4. tónu skok
+            # zpět a další buňka o krok dál (kaskáda). Směr = down (sestupně) | up (vzestupně).
+            # Nad 'wt' dominantou jsou tercie augmentované (celotónové). cell=4 = délka buňky.
+            cell, up = 4, (motion == "thirds_up")
+            if up:                                             # start NÍZKO, buňky stoupají
+                cand = [k for k in range(len(sc)) if sc[k] >= harmony.center - 3]
+                si = cand[0] if cand else 0
+            else:                                              # start VYSOKO, buňky klesají
+                cand = [k for k in range(len(sc)) if sc[k] <= harmony.center + 3]
+                si = cand[-1] if cand else len(sc) - 1
             fallback = sc[si]
-            pos, cur, dd = {}, si, -2
+            pos = {}
             for n in range(npb):
-                cur = max(0, min(len(sc) - 1, cur))
-                pos[n] = sc[cur]
-                nx = cur + dd
-                if nx < 0:                                     # u dna obrať nahoru (stoupavá varianta)
-                    dd = -dd; nx = cur + dd
-                cur = nx
+                ci, j = n // cell, n % cell                    # buňka, pozice v buňce
+                idx = (si + ci + 2 * j) if up else (si - ci - 2 * j)   # ob tón = tercie; +ci/-ci = posun buňky
+                pos[n] = sc[max(0, min(len(sc) - 1, idx))]
         elif motion == "thirds":
             # PATTERN PO MALÝCH TERCIÍCH: 4-tónová vzestupná buňka, sekvencovaná o m3 níž
             # (= 2 indexy v symetrické stupnici) -> typický diminished pattern (ukáže symetrii).
