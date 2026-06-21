@@ -15,7 +15,7 @@ import mido
 
 from voice.harmony import Harmony, TEMPLATES
 from voice.render import to_midi
-from voice import build
+from voice import build, view
 
 
 def default_port(names):
@@ -94,6 +94,14 @@ class App:
         self.status = tk.StringVar(value="Připraveno. (builder cíl+spojka — guide tóny → bebop/approach)")
         ttk.Label(f, textvariable=self.status, foreground="#246", width=52, anchor="w").grid(
             row=r, column=0, columnspan=4, sticky="w", **pad)
+        r += 1
+        # anotovaný náhled (tabule): LH+voice-leading · tóny stupnice · landing
+        prev = ttk.LabelFrame(f, text="Náhled: ● levá ruka (přesun) · ● tóny stupnice · ◯ guide (3/7) · ▼ landing", padding=4)
+        prev.grid(row=r, column=0, columnspan=4, sticky="we", **pad)
+        self.canvas = tk.Canvas(prev, width=620, height=320, bg="#fafafa", highlightthickness=0)
+        sb = ttk.Scrollbar(prev, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=sb.set)
+        self.canvas.grid(row=0, column=0, sticky="nsew"); sb.grid(row=0, column=1, sticky="ns")
 
     def refresh_ports(self):
         names = mido.get_output_names() or [""]
@@ -131,23 +139,35 @@ class App:
             H = Harmony(self.chords.get(), color=self.color.get())
             line = build.generate(H, density=self.density.get(),
                                   seed=self.seed.get(), approach=self.approach.get())
+            _, landings = build.guide_path(H)
             to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
+            self.root.after(0, lambda: view.draw(self.canvas, H, landings, line))   # tabule
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
-            self._play_file(self.preview)
+            self._play_follow(self.preview, len(H))
             if not self.stop.is_set():
                 self.status.set("Hotovo.")
         except Exception as e:
             traceback.print_exc()
             self.status.set(f"Chyba: {e}")
+        finally:
+            self.root.after(0, lambda: view.set_playing(self.canvas, None, 0))
 
-    def _play_file(self, path):
+    def _play_follow(self, path, n_bars):
+        """Přehraje MIDI a z playheadu rozsvěcí zelenou linku u právě hraného akordu."""
         name = self.port.get()
         if not name:
             raise RuntimeError("Není vybraný MIDI port.")
+        bar_s = 4 * 60.0 / max(1, self.bpm.get())
+        cur = -1; t = 0.0
         with mido.open_output(name) as out:
             for msg in mido.MidiFile(path).play():
                 if self.stop.is_set():
                     break
+                t += msg.time
+                bar = int(t / bar_s)
+                if bar != cur and 0 <= bar < n_bars:
+                    cur = bar
+                    self.root.after(0, lambda b=bar: view.set_playing(self.canvas, b, n_bars))
                 out.send(msg)
             for ch in range(16):
                 out.send(mido.Message("control_change", channel=ch, control=123, value=0))

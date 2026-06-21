@@ -44,6 +44,18 @@ def _scale_between(scale, a, b, frac):
     return scale[max(0, min(len(scale) - 1, j))]
 
 
+def guide_path(harmony):
+    """Voice-led cesta guide tónů (vstup každého taktu). landing do dalšího akordu
+    = vstup taktu i+1. Pro náhled-tabuli i pro builder (1. doba)."""
+    entries = []; prev = harmony.center
+    for bar in harmony.bars:
+        e = _nearest(bar.guides or bar.scale, prev)
+        entries.append(e); prev = e
+    n = len(entries)
+    landings = [entries[(i + 1) % n] for i in range(n)]
+    return entries, landings
+
+
 def generate(harmony, density=2, seed=1, approach=0.5, taste=None):
     """harmony = Harmony, density = not/dobu. Vrať [(onset, délka, MIDI)].
     DRILL se zaměřením na LANDING tóny: 1. doba = guide tón (voice-led), pak akordové
