@@ -65,6 +65,7 @@ class App:
         prev.rowconfigure(0, weight=1); prev.columnconfigure(0, weight=1)
         self._controls(left)
         self._preview(prev)
+        self._menubar()                                    # port/tempo/flip/pokročilé do menu
 
     def _lesson_header(self, parent):
         """Tabule: titul lekce + výklad + A/B (vpravo nahoře nad náhledem)."""
@@ -114,42 +115,23 @@ class App:
         ttk.OptionMenu(g, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
             row=2, column=1, columnspan=3, sticky="we", **pad)
 
-        # === Přehrávání (sdílené) ===
-        g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
-        g3.grid(row=2, column=0, sticky="we", pady=(0, 8))
-        ttk.Label(g3, text="MIDI port:").grid(row=0, column=0, sticky="w", **pad)
-        names = mido.get_output_names() or [""]
-        self.port = tk.StringVar(value=default_port(names))
-        self.port_menu = ttk.OptionMenu(g3, self.port, self.port.get(), *names)
-        self.port_menu.grid(row=0, column=1, columnspan=2, sticky="we", **pad)
-        ttk.Button(g3, text="⟳", width=3, command=self.refresh_ports).grid(row=0, column=3, **pad)
-        ttk.Label(g3, text="BPM:").grid(row=1, column=0, sticky="w", **pad)
-        self.bpm = tk.IntVar(value=110)
-        ttk.Spinbox(g3, from_=40, to=240, textvariable=self.bpm, width=5).grid(row=1, column=1, sticky="w", **pad)
-        btns = ttk.Frame(g3); btns.grid(row=2, column=0, columnspan=4, sticky="we", pady=6)
+        # === Transport (akce -- sdílené; nastavení portu/tempa je v menu Přehrávání) ===
+        btns = ttk.Frame(f); btns.grid(row=2, column=0, sticky="we", pady=(0, 6))
         ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=2)
         ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=2)
         ttk.Button(btns, text="🎲 jiný příklad", command=self.on_reseed).pack(side="left", padx=2)
 
-        self.flip = tk.BooleanVar(value=False)
-        ttk.Checkbutton(f, text="obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
-                        command=self._redraw).grid(row=3, column=0, sticky="w", pady=(2, 0))
-
-        # === Pokročilé (generativní páky -- skryté; nastaví je lekce) ===
-        self.adv_on = tk.BooleanVar(value=False)
-        ttk.Checkbutton(f, text="Pokročilé (generativní páky)", variable=self.adv_on,
-                        command=self._toggle_adv).grid(row=4, column=0, sticky="w", pady=(6, 0))
-        self._advanced(f)
+        self._advanced(f)        # skrytý panel; zapíná menu Zobrazení -> Pokročilé
 
         self.status = tk.StringVar(value="Připraveno. (klik na klávesy = přehraj: vlevo akord, vpravo linka)")
         ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
-                  wraplength=300).grid(row=6, column=0, sticky="we", pady=(6, 0))
+                  wraplength=300).grid(row=4, column=0, sticky="we", pady=(6, 0))
 
     def _advanced(self, f):
         """Skrytý panel generativních os -- lekce je nastaví, pokročilý uživatel ladí."""
         pad = {"padx": 4, "pady": 3}
         a = ttk.LabelFrame(f, text="Pokročilé — nastaví je lekce, můžeš doladit", padding=6)
-        a.grid(row=5, column=0, sticky="we", pady=(0, 4)); a.grid_remove()
+        a.grid(row=3, column=0, sticky="we", pady=(0, 4)); a.grid_remove()
         self.adv_frame = a
         ttk.Label(a, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
         self.density = tk.IntVar(value=2)
@@ -434,15 +416,40 @@ class App:
                 out.send(mido.Message("note_on", note=nn, velocity=92)); time.sleep(d * 0.9)
                 out.send(mido.Message("note_off", note=nn, velocity=0)); time.sleep(d * 0.1)
 
-    def refresh_ports(self):
+    def _menubar(self):
+        """Horní menu programu: Přehrávání (port, tempo) + Zobrazení (flip, Pokročilé)."""
         names = mido.get_output_names() or [""]
-        menu = self.port_menu["menu"]
-        menu.delete(0, "end")
+        self.port = tk.StringVar(value=default_port(names))
+        self.bpm = tk.IntVar(value=110)
+        self.flip = tk.BooleanVar(value=False)
+        self.adv_on = tk.BooleanVar(value=False)
+        m = tk.Menu(self.root)
+        play = tk.Menu(m, tearoff=0)
+        self.port_menu = tk.Menu(play, tearoff=0)
+        self._fill_ports()
+        play.add_cascade(label="MIDI port", menu=self.port_menu)
+        bpm_menu = tk.Menu(play, tearoff=0)
+        for t in (60, 80, 90, 100, 110, 120, 140, 160, 180):
+            bpm_menu.add_radiobutton(label=str(t), value=t, variable=self.bpm)
+        play.add_cascade(label="Tempo (BPM)", menu=bpm_menu)
+        m.add_cascade(label="Přehrávání", menu=play)
+        vw = tk.Menu(m, tearoff=0)
+        vw.add_checkbutton(label="Obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
+                           command=self._redraw)
+        vw.add_checkbutton(label="Pokročilé: generativní páky", variable=self.adv_on,
+                           command=self._toggle_adv)
+        m.add_cascade(label="Zobrazení", menu=vw)
+        self.root.config(menu=m)
+
+    def _fill_ports(self):
+        self.port_menu.delete(0, "end")
+        names = mido.get_output_names() or [""]
         for n in names:
-            menu.add_command(label=n, command=lambda v=n: self.port.set(v))
+            self.port_menu.add_radiobutton(label=n, value=n, variable=self.port)
         if self.port.get() not in names:
             self.port.set(default_port(names))
-        self.status.set(f"Porty obnoveny ({len(names)}).")
+        self.port_menu.add_separator()
+        self.port_menu.add_command(label="Obnovit porty", command=self._fill_ports)
 
     def on_reseed(self):
         self.seed.set((self.seed.get() + 1) % 10000)
