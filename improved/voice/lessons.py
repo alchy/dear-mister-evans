@@ -187,7 +187,7 @@ LESSONS = [
                     "dolů po terciích, skok zpět nahoru a další buňka o krok níž (kaskáda dolů). "
                     "Nad moll diatonické (Am7: D B G E), nad whole-tone dominantou augmentované "
                     "(D7: D A♯ F♯). Hustota řídí délku běhu. A/B: rovný běh (A) vs tercie (B)."),
-        "preset": {"density": 2, "approach": 0.0, "color": "wt", "voicing": "rootless",
+        "preset": {"density": 1, "approach": 0.0, "color": "wt", "voicing": "rootless",
                    "chords": "Am7 D7 Gm7 Gm7"},
         "focus": "scale",
         "motion": "thirds_down",
@@ -199,7 +199,7 @@ LESSONS = [
         "explain": ("Stejná šablona, opačný směr: 4 tóny NAHORU po terciích, skok dolů a další "
                     "buňka o krok výš (kaskáda nahoru). Nad moll diatonické (Am7: A C E G), nad "
                     "whole-tone dominantou augmentované. Hustota řídí délku. A/B: rovný běh vs tercie."),
-        "preset": {"density": 2, "approach": 0.0, "color": "wt", "voicing": "rootless",
+        "preset": {"density": 1, "approach": 0.0, "color": "wt", "voicing": "rootless",
                    "chords": "Am7 D7 Gm7 Gm7"},
         "focus": "scale",
         "motion": "thirds_up",

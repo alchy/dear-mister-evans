@@ -78,6 +78,7 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
     bars = harmony.bars
     line = []
     prev_exit = harmony.center
+    casc = None                                              # ukazatel kaskády tercií (napříč takty)
     for i, bar in enumerate(bars):
         sc = bar.scale
         ct = bar.chord_tones or sc                           # arpeggiujeme akordové tóny
@@ -108,22 +109,29 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
                     dd = -dd; nx = cur + dd
                 cur = nx
         elif motion in ("thirds_down", "thirds_up"):
-            # TERCIE PO 4-TÓNOVÝCH BUŇKÁCH: každá buňka = 4 tóny po terciích; po 4. tónu skok
-            # zpět a další buňka o krok dál (kaskáda). Směr = down (sestupně) | up (vzestupně).
-            # Nad 'wt' dominantou jsou tercie augmentované (celotónové). cell=4 = délka buňky.
+            # TERCIE PO 4-TÓNOVÝCH BUŇKÁCH, PLYNULÁ KASKÁDA napříč akordy: další buňka začne o
+            # KROK za koncem předchozí (E->F#), takže přechod akordu plyne (Am7: D B G E -> D7
+            # wt: F# D A# F#). Když dojede ke kraji rejstříku, vrať se k vrcholu. cell=4.
             cell, up = 4, (motion == "thirds_up")
-            if up:                                             # start NÍZKO, buňky stoupají
-                cand = [k for k in range(len(sc)) if sc[k] >= harmony.center - 3]
-                si = cand[0] if cand else 0
-            else:                                              # start VYSOKO, buňky klesají
-                cand = [k for k in range(len(sc)) if sc[k] <= harmony.center + 3]
-                si = cand[-1] if cand else len(sc) - 1
-            fallback = sc[si]
-            pos = {}
-            for n in range(npb):
-                ci, j = n // cell, n % cell                    # buňka, pozice v buňce
-                idx = (si + ci + 2 * j) if up else (si - ci - 2 * j)   # ob tón = tercie; +ci/-ci = posun buňky
-                pos[n] = sc[max(0, min(len(sc) - 1, idx))]
+            top_start, bot_start = harmony.hi - 14, harmony.lo + 14   # pevný vrchol/dno (~D5 / ~D4)
+            hi_lim, lo_lim = harmony.hi - 11, harmony.lo + 11         # za hranicí -> reset zpět
+            pos, nn = {}, 0
+            while nn < npb:
+                if casc is None:
+                    casc = bot_start if up else top_start
+                elif up and casc > hi_lim:                     # u stropu zase zdola
+                    casc = bot_start
+                elif (not up) and casc < lo_lim:               # u dna zase shora
+                    casc = top_start
+                si = min(range(len(sc)), key=lambda k: abs(sc[k] - casc))   # nejbližší tón stupnice
+                last = sc[si]
+                for j in range(cell):
+                    if nn >= npb:
+                        break
+                    idx = max(0, min(len(sc) - 1, si + (2 * j if up else -2 * j)))
+                    pos[nn] = sc[idx]; last = sc[idx]; nn += 1
+                casc = last + (-2 if up else 2)                # další buňka o krok za koncem (kaskáda)
+            fallback = sc[min(range(len(sc)), key=lambda k: abs(sc[k] - casc))]
         elif motion == "thirds":
             # PATTERN PO MALÝCH TERCIÍCH: 4-tónová vzestupná buňka, sekvencovaná o m3 níž
             # (= 2 indexy v symetrické stupnici) -> typický diminished pattern (ukáže symetrii).

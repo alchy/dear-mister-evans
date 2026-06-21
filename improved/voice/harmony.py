@@ -98,7 +98,7 @@ class Bar:
 class Harmony:
     """Progrese (string/[(root,q)]) -> [Bar]. Chord-scale dle FUNKCE (kontextově,
     z následujícího akordu). color = 'inside' | 'outside' (napětí dominant->moll)."""
-    def __init__(self, progression, lo=55, hi=88, center=None, color="inside",
+    def __init__(self, progression, lo=50, hi=88, center=None, color="inside",
                  voicing="rootless", bebop=False, scale_override=None):
         # center = referenční rejstřík MELODIE; voicing = TYP rozložení LH (viz voicings).
         # bebop = použij bebopovou (8-tónovou) chord-scale -> průchod drží akord. tóny na těžké.
