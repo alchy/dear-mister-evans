@@ -277,7 +277,7 @@ class App:
                 if self.stop.is_set():
                     break
                 H, landings, line, density = self._gen(**ab[tag])
-                to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density)
+                to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density, swing=self.swing.get())
                 self._draw_state = (H, landings, line)
                 self.root.after(0, self._redraw)
                 self.status.set(f"A/B — {tag}: {ab[tag]}")
@@ -310,7 +310,7 @@ class App:
 
     # ---------- serializace nastavení do JSON (jako prototyp) ----------
     PERSIST = ["lesson", "root_note", "mode", "pattern", "chords", "density", "approach",
-               "enclose", "space", "bebop", "color", "bpm", "seed", "voicing", "port", "flip"]
+               "enclose", "space", "bebop", "color", "bpm", "seed", "voicing", "port", "flip", "swing"]
 
     def _state_dict(self):
         return {k: getattr(self, k).get() for k in self.PERSIST if hasattr(self, k)}
@@ -340,7 +340,7 @@ class App:
             setv("root_note"); setv("mode")
             self._refresh_patterns()                  # nabídka postupů dle načtené tonality
             for k in ("pattern", "chords", "density", "approach", "enclose", "space", "bebop",
-                      "color", "bpm", "seed", "voicing", "port", "flip", "lesson"):
+                      "color", "bpm", "seed", "voicing", "port", "flip", "swing", "lesson"):
                 setv(k)
             if "lesson" in d:
                 les = lessons.by_title(self.lesson.get())
@@ -491,6 +491,7 @@ class App:
         self.bpm = tk.IntVar(value=110)
         self.flip = tk.BooleanVar(value=False)
         self.adv_on = tk.BooleanVar(value=False)
+        self.swing = tk.DoubleVar(value=0.6)       # 0.5 rovně .. ~0.64 plný swing (feel z míry)
         self.lesson = tk.StringVar(value=lessons.titles()[0])
         m = tk.Menu(self.root)
         # --- Lekce: sylabus kurzu po blocích (radio) ---
@@ -510,6 +511,10 @@ class App:
         for t in (60, 80, 90, 100, 110, 120, 140, 160, 180):
             bpm_menu.add_radiobutton(label=str(t), value=t, variable=self.bpm)
         play.add_cascade(label="Tempo (BPM)", menu=bpm_menu)
+        sw_menu = tk.Menu(play, tearoff=0)
+        for lbl, val in (("rovně", 0.5), ("swing lehký", 0.57), ("swing střední", 0.6), ("swing plný", 0.64)):
+            sw_menu.add_radiobutton(label=lbl, value=val, variable=self.swing)
+        play.add_cascade(label="Swing / feel", menu=sw_menu)
         m.add_cascade(label="Přehrávání", menu=play)
         vw = tk.Menu(m, tearoff=0)
         vw.add_checkbutton(label="Obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
@@ -545,7 +550,7 @@ class App:
         try:
             self.status.set("Generuji…")
             H, landings, line, density = self._gen()
-            to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density)
+            to_midi(H, line, self.preview, bpm=self.bpm.get(), density=density, swing=self.swing.get())
             self._draw_state = (H, landings, line)             # ulož pro responzivní překreslení
             self.root.after(0, self._redraw)
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
