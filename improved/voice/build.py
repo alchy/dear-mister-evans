@@ -140,6 +140,22 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
             hi_lim, lo_lim = harmony.hi - 11, harmony.lo + 11
             pos, casc, fallback = _cascade_cells(sc, casc, npb, step, up,
                                                  top_start, bot_start, lo_lim, hi_lim)
+        elif motion in ("seq_up", "seq_down"):
+            # SEKVENCE PO 4 (překryvné skupiny): [1234][2345][3456]… posun o STUPEŇ. Nad
+            # pentatonikou = klasická pentatonická sekvence. up/down = směr.
+            up, grp = (motion == "seq_up"), 4
+            if up:
+                cand = [k for k in range(len(sc)) if sc[k] >= harmony.lo + 12]
+                base = cand[0] if cand else 0
+            else:
+                cand = [k for k in range(len(sc)) if sc[k] <= harmony.hi - 12]
+                base = cand[-1] if cand else len(sc) - 1
+            fallback = sc[base]
+            pos = {}
+            for n in range(npb):
+                g, j = n // grp, n % grp                       # skupina, pozice ve skupině
+                idx = base + ((g + j) if up else -(g + j))     # skupina o stupeň dál, uvnitř krok
+                pos[n] = sc[max(0, min(len(sc) - 1, idx))]
         elif motion == "thirds":
             # PATTERN PO MALÝCH TERCIÍCH: 4-tónová vzestupná buňka, sekvencovaná o m3 níž
             # (= 2 indexy v symetrické stupnici) -> typický diminished pattern (ukáže symetrii).

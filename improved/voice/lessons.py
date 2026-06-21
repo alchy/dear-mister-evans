@@ -217,6 +217,18 @@ LESSONS = [
         "motion": "fourths_up",
         "ab": {"A": {"motion": "fourths_down"}, "B": {"motion": "fourths_up"}},
     },
+    {
+        "key": "pent_seq",
+        "title": "19 · Pentatonické sekvence",
+        "explain": ("Sekvence po 4 (překryvné skupiny: 1235 2356 3561…) nad PENTATONIKOU — "
+                    "klasický stavební kámen sól. Kotveno na tóniku, postup volný. A/B: mollová "
+                    "(A) vs durová (B) pentatonika."),
+        "preset": {"density": 2, "approach": 0.0, "voicing": "rootless", "scale": "maj_pent",
+                   "root": "C", "mode": "dur", "pattern": "I–vi–ii–V"},
+        "focus": "scale",
+        "motion": "seq_up",
+        "ab": {"A": {"scale": "min_pent"}, "B": {"scale": "maj_pent"}},
+    },
 ]
 
 
@@ -229,7 +241,7 @@ BLOCKS = [
     ("E · Moll", ["minor_ii_v_i"]),
     ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
-    ("H · Běhy / licky", ["thirds_run", "thirds_run_up", "fourths_run"]),
+    ("H · Běhy / licky", ["thirds_run", "thirds_run_up", "fourths_run", "pent_seq"]),
 ]
 
 
