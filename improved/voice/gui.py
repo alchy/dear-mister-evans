@@ -109,6 +109,10 @@ class App:
         self.pattern_menu = ttk.OptionMenu(g, self.pattern, self.pattern.get(), *prog.patterns("dur"),
                                            command=lambda *_: self._rebuild())
         self.pattern_menu.grid(row=1, column=1, columnspan=3, sticky="we", **pad)
+        ttk.Label(g, text="Vedení akordu (LH):").grid(row=2, column=0, sticky="w", **pad)
+        self.voicing = tk.StringVar(value=voi.LABELS["rootless"])      # vždy volitelné (pilíř: akord v levé)
+        ttk.OptionMenu(g, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
+            row=2, column=1, columnspan=3, sticky="we", **pad)
 
         # === Přehrávání (sdílené) ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
@@ -167,10 +171,6 @@ class App:
         ttk.Label(a, text="Seed:").grid(row=2, column=2, sticky="e", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(a, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=3, sticky="w", **pad)
-        ttk.Label(a, text="Rozložení LH:").grid(row=3, column=0, sticky="w", **pad)
-        self.voicing = tk.StringVar(value=voi.LABELS["rootless"])
-        ttk.OptionMenu(a, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
-            row=3, column=1, columnspan=3, sticky="we", **pad)
         ttk.Label(a, text="Akordy:").grid(row=4, column=0, sticky="w", **pad)
         self.chords = tk.StringVar(value=prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
         ttk.Entry(a, textvariable=self.chords, width=30).grid(row=4, column=1, columnspan=3, sticky="we", **pad)
