@@ -6,7 +6,7 @@ Generuj & přehraj / Stop. Náhled a ~5 os dle SPECu přibudou. Hraje balík voi
 
 Spuštění:  python improved/voice/gui.py
 """
-import os, sys, json, threading, tempfile, traceback
+import os, sys, json, threading, tempfile, traceback, subprocess, ast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))   # improved/ na path
 import tkinter as tk
@@ -16,6 +16,25 @@ import mido
 from voice.harmony import Harmony
 from voice.render import to_midi
 from voice import build, view, progressions as prog, voicings as voi, lessons, tunes
+
+
+def _list_ports():
+    """MIDI-out porty — enumerováno v ODDĚLENÉM procesu.
+
+    Proč subprocess: python-rtmidi (CoreMIDI) na macOS fatálně padá
+    (`PyEval_RestoreThread: GIL not held`), když se porty enumerují za běhu už
+    inicializovaného Tk/Cocoa runloopu. V čistém procesu bez Tk je enumerace
+    bezpečná a vrací stejný seznam; používá se i pro „Obnovit porty" za běhu.
+    """
+    try:
+        out = subprocess.run(
+            [sys.executable, "-c", "import mido; print(mido.get_output_names())"],
+            capture_output=True, text=True, timeout=10,
+        )
+        names = ast.literal_eval((out.stdout or "").strip() or "[]")
+        return [n for n in names if n]
+    except Exception:
+        return []
 
 
 def default_port(names):
@@ -501,7 +520,7 @@ class App:
 
     def _menubar(self):
         """Horní menu programu: Lekce (sylabus po blocích) + Přehrávání + Zobrazení."""
-        names = mido.get_output_names() or [""]
+        names = _list_ports() or [""]
         self.port = tk.StringVar(value=default_port(names))
         self.bpm = tk.IntVar(value=110)
         self.flip = tk.BooleanVar(value=False)
@@ -551,7 +570,7 @@ class App:
 
     def _fill_ports(self):
         self.port_menu.delete(0, "end")
-        names = mido.get_output_names() or [""]
+        names = _list_ports() or [""]
         for n in names:
             self.port_menu.add_radiobutton(label=n, value=n, variable=self.port)
         if self.port.get() not in names:
