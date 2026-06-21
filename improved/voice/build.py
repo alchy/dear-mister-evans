@@ -104,7 +104,11 @@ def generate(harmony, density=2, seed=1, approach=0.5, taste=None):
         for n in range(npb):
             p = pos.get(n, targets[0])
             if p == prev:                                     # nikdy neopakuj tentýž tón
-                p += (1 if d > 0 else -1)
+                on_beat = (n % density == 0)                  # silná doba -> jiný CHORD tón (zní jako akord);
+                pool = [q for q in (ct if on_beat else sc) if q != p]   # slabá -> jiný tón stupnice (ne chromatika)
+                if pool:
+                    fwd = [q for q in pool if (q - p) * d > 0]
+                    p = min(fwd or pool, key=lambda q: abs(q - p))
             line.append((i * BPC + n / density, (1.0 / density) * 0.9, p))
             prev = p
         prev_exit = prev

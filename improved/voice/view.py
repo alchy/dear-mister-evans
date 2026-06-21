@@ -198,8 +198,9 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
         _dot(cv, bx, by, g.DOTR, fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
         if mel_pos[i]:
-            scpc = set(s % 12 for s in bar.scale)                 # diatonický vs chromatický approach
-            cols = [DOT_MEL if (p % 12 in scpc) else DOT_CHROM for p in mel[i]]
+            ok = set(s % 12 for s in bar.scale) | set(c % 12 for c in bar.chord_tones)
+            cols = [DOT_MEL if (p % 12 in ok) else DOT_CHROM     # fialová = mimo stupnici I chord-tóny (čistá chromatika)
+                    for p in mel[i]]
             _dots(cv, g, mel_pos[i], cols)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))
