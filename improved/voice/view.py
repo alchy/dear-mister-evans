@@ -20,7 +20,22 @@ DOT_MEL = "#e8731e"          # melodický tón ZE STUPNICE (diatonický)
 DOT_CHROM = "#a23bd6"       # chromatický approach (MIMO stupnici) -- fialově, vizuálně odlišeno
 VL_LINE = "#1f7ae0"
 ROOT_YEL = "#f0c020"        # naznačený (vynechaný) root u rootless voicingu -- žlutě, bez čísla
+MUTE = "#d9d9d9"            # ztlumená vrstva (mimo fokus lekce)
+SCALE_GRN = "#bfe3c0"       # paleta tónů stupnice
+GUIDE_GRN = "#2a9d3a"       # guide kroužek (3/7)
+LAND_RED = "#e23030"        # landing značka/šipka/popisek
 _PC = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def _focus_flags(focus):
+    """Co je AKTIVNÍ (plná barva) podle fokusu lekce; None = vše aktivní."""
+    return {
+        "scale": focus in (None, "scale"),
+        "guides": focus in (None, "guides", "landing"),
+        "landing": focus in (None, "landing"),
+        "approach": focus == "approach",        # zdůrazni chromatiku (kroužek)
+        "voicing": focus == "voicing",          # zdůrazni vedení LH (tlustší čáry)
+    }
 
 
 def whites(lo, m):
@@ -135,13 +150,17 @@ def _sym(bar):
     return _PC[bar.root % 12] + bar.quality
 
 
-def draw(cv, harmony, landings, line=None, width=None, flip=False):
+def draw(cv, harmony, landings, line=None, width=None, flip=False, focus=None):
     cv.delete("all")
     blo, bhi = _bass_range(harmony)                          # bas klaviatura dle dat
     g = _geom(width if width is not None else cv.winfo_width(), blo, bhi)
     bars = harmony.bars
     n = len(bars)
     mel = _by_bar(line, n) if line else None
+    fl = _focus_flags(focus)                                  # která vrstva je ve fokusu lekce
+    sc_col = SCALE_GRN if fl["scale"] else MUTE
+    gd_col = GUIDE_GRN if fl["guides"] else MUTE
+    ld_col = LAND_RED if fl["landing"] else MUTE
 
     def y0_of(i):                                             # vrch řádku datového akordu i
         s = (n - 1 - i) if flip else i                        # flip = zdola nahoru
@@ -157,29 +176,30 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
         baseM = ky + g.WH - 4
         for p in bar.scale:                                   # 2) tóny stupnice (paleta)
             if MEL_LO <= p <= MEL_HI:
-                _dot(cv, _cx(g, g.mel_x0, MEL_LO, MEL_HI, p), baseM, g.DOTR * 0.4, fill="#bfe3c0", outline="")
+                _dot(cv, _cx(g, g.mel_x0, MEL_LO, MEL_HI, p), baseM, g.DOTR * 0.4, fill=sc_col, outline="")
         for p in bar.guides:                                  # guide tóny (3/7)
             if MEL_LO <= p <= MEL_HI:
                 _dot(cv, _cx(g, g.mel_x0, MEL_LO, MEL_HI, p), baseM, g.DOTR * 0.7,
-                     outline="#2a9d3a", width=2, fill="")
+                     outline=gd_col, width=(2 if fl["guides"] else 1), fill="")
         lx = _cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i])               # 3) landing značka
         af = max(10, g.fnum + 2)
         cv.create_text(lx, ky - 1, text=("▲" if flip else "▼"),  # ukazuje k řádku dalšího akordu
-                       fill="#e23030", font=("Segoe UI", af, "bold"))
+                       fill=ld_col, font=("Segoe UI", af, "bold"))
         nxt = bars[(i + 1) % n]                                           # akord, do kterého se míří
         iv = (landings[i] - nxt.root) % 12                               # guide tón = 3 nebo 7 cíle
         deg = "3" if iv in (3, 4) else "7" if iv in (9, 10, 11) else "?"
         cv.create_text(lx, ky - 1 - af, anchor="s",                     # popisek NAD šipkou (mimo klávesy)
                        text=f"{_PC[landings[i] % 12]} ({deg}·{_sym(nxt)})",
-                       fill="#e23030", font=("Segoe UI", g.flbl, "bold"))
+                       fill=ld_col, font=("Segoe UI", g.flbl, "bold"))
     # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
     lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
           for i, bar in enumerate(bars)]
     # čáry voice-leadingu MEZI BUBLINAMI voicingu (k-tý hlas akordu i -> k-tý hlas i+1)
+    vlw = 4 if fl["voicing"] else 2                          # fokus 'voicing' -> zvýrazni vedení LH
     for i in range(n - 1):
         a, b = lh[i], lh[i + 1]
         for k in range(min(len(a), len(b))):
-            cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=2)
+            cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=vlw)
     # melodie: pozice koleček (spočti jednou -> pro spojnici i kreslení)
     mel_pos = [_seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]) if mel else []
                for i in range(n)]
@@ -190,7 +210,7 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
             if mel_pos[i] and mel_pos[i + 1]:
                 fx, fy = mel_pos[i][-1]
                 tx, ty = mel_pos[i + 1][0]
-                cv.create_line(fx, fy, tx, ty, fill="#e23030", width=1, dash=(3, 2),
+                cv.create_line(fx, fy, tx, ty, fill=ld_col, width=1, dash=(3, 2),
                                arrow="last")
     # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
@@ -201,6 +221,10 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
             ok = set(s % 12 for s in bar.scale) | set(c % 12 for c in bar.chord_tones)
             cols = [DOT_MEL if (p % 12 in ok) else DOT_CHROM     # fialová = mimo stupnici I chord-tóny (čistá chromatika)
                     for p in mel[i]]
+            if fl["approach"]:                                   # fokus lekce -> kroužek kolem chromatiky
+                for (cx, cy), c in zip(mel_pos[i], cols):
+                    if c == DOT_CHROM:
+                        _dot(cv, cx, cy, g.DOTR + 3, fill="", outline=DOT_CHROM, width=2)
             _dots(cv, g, mel_pos[i], cols)
     total_w = g.mel_x0 + whites(MEL_LO, MEL_HI + 1) * g.WW + 6
     cv.config(scrollregion=(0, 0, total_w, PAD + n * g.ROW_H + 6))

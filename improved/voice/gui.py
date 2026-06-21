@@ -36,6 +36,7 @@ class App:
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
         self._draw_state = None                    # (harmony, landings, line) pro překreslení
+        self._focus = lessons.LESSONS[0].get("focus")   # fokus aktuální lekce (zvýraznění vrstvy)
         self._bass_range = (36, 64)                # dynamický rozsah bas klaviatury (z draw)
         self._resize_job = None
         self._loading = False
@@ -179,6 +180,7 @@ class App:
         if "mode" in p:
             self.mode.set(p["mode"]); self._refresh_patterns()
         if "pattern" in p: self.pattern.set(p["pattern"])
+        self._focus = les.get("focus")               # zvýrazni vrstvu lekce v náhledu
         self._rebuild()
         self.explain.set(les["explain"])
         self.status.set(f"Lekce: {les['title']}")
@@ -256,7 +258,9 @@ class App:
                       "seed", "voicing", "port", "flip", "lesson"):
                 setv(k)
             if "lesson" in d:
-                self.explain.set(lessons.by_title(self.lesson.get())["explain"])
+                les = lessons.by_title(self.lesson.get())
+                self.explain.set(les["explain"])
+                self._focus = les.get("focus")
             self.status.set("Obnoveno z minula.")
         finally:
             self._loading = False
@@ -316,7 +320,8 @@ class App:
         if self._draw_state:
             H, land, line = self._draw_state
             self._bass_range = view.draw(self.canvas, H, land, line,
-                                         width=self.canvas.winfo_width(), flip=self.flip.get())
+                                         width=self.canvas.winfo_width(), flip=self.flip.get(),
+                                         focus=self._focus)
 
     # ---- klik na klaviaturu = přehraj zobrazený blok (vlevo akord, vpravo linka) ----
     # ---------- JEDEN model přehrávání (DRY pro všechny komponenty) ----------
