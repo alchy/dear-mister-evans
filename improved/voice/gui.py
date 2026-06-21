@@ -86,21 +86,10 @@ class App:
 
     def _controls(self, f):
         pad = {"padx": 4, "pady": 3}
-        # === KURZ — sylabus lekcí (po blocích) ===
-        gk = ttk.LabelFrame(f, text="KURZ — lekce", padding=4)
-        gk.grid(row=0, column=0, sticky="we", pady=(0, 8))
-        self.lesson = tk.StringVar(value=lessons.titles()[0])
-        r = 0
-        for name, les_list in lessons.blocks():
-            ttk.Label(gk, text=name, font=("Segoe UI", 9, "bold"), foreground="#777").grid(
-                row=r, column=0, sticky="w", padx=2, pady=(4, 0)); r += 1
-            for les in les_list:
-                ttk.Radiobutton(gk, text=les["title"], value=les["title"], variable=self.lesson,
-                                command=self.apply_lesson).grid(row=r, column=0, sticky="w", padx=(14, 2)); r += 1
-
+        # Výběr lekce je v horním menu „Lekce" (sylabus po blocích) -> levý sloupec jen sdílené.
         # === Progrese (sdílený kontext cvičení) ===
         g = ttk.LabelFrame(f, text="Progrese", padding=6)
-        g.grid(row=1, column=0, sticky="we", pady=(0, 8))
+        g.grid(row=0, column=0, sticky="we", pady=(0, 8))
         lbl_root = ttk.Label(g, text="Tónika:"); lbl_root.grid(row=0, column=0, sticky="w", **pad)
         self.root_note = tk.StringVar(value="C")
         m_root = ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES, command=lambda *_: self._on_root_change())
@@ -123,7 +112,7 @@ class App:
             row=2, column=1, columnspan=3, sticky="we", **pad)
 
         # === Transport (akce -- sdílené; nastavení portu/tempa je v menu Přehrávání) ===
-        btns = ttk.Frame(f); btns.grid(row=2, column=0, sticky="we", pady=(0, 6))
+        btns = ttk.Frame(f); btns.grid(row=1, column=0, sticky="we", pady=(0, 6))
         ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=2)
         ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=2)
         ttk.Button(btns, text="🎲 jiný příklad", command=self.on_reseed).pack(side="left", padx=2)
@@ -132,13 +121,13 @@ class App:
 
         self.status = tk.StringVar(value="Připraveno. (klik na klávesy = přehraj: vlevo akord, vpravo linka)")
         ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
-                  wraplength=300).grid(row=4, column=0, sticky="we", pady=(6, 0))
+                  wraplength=300).grid(row=3, column=0, sticky="we", pady=(6, 0))
 
     def _advanced(self, f):
         """Skrytý panel generativních os -- lekce je nastaví, pokročilý uživatel ladí."""
         pad = {"padx": 4, "pady": 3}
         a = ttk.LabelFrame(f, text="Pokročilé — nastaví je lekce, můžeš doladit", padding=6)
-        a.grid(row=3, column=0, sticky="we", pady=(0, 4)); a.grid_remove()
+        a.grid(row=2, column=0, sticky="we", pady=(0, 4)); a.grid_remove()
         self.adv_frame = a
         ttk.Label(a, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
         self.density = tk.IntVar(value=2)
@@ -496,13 +485,23 @@ class App:
                 out.send(mido.Message("note_off", note=nn, velocity=0)); time.sleep(d * 0.1)
 
     def _menubar(self):
-        """Horní menu programu: Přehrávání (port, tempo) + Zobrazení (flip, Pokročilé)."""
+        """Horní menu programu: Lekce (sylabus po blocích) + Přehrávání + Zobrazení."""
         names = mido.get_output_names() or [""]
         self.port = tk.StringVar(value=default_port(names))
         self.bpm = tk.IntVar(value=110)
         self.flip = tk.BooleanVar(value=False)
         self.adv_on = tk.BooleanVar(value=False)
+        self.lesson = tk.StringVar(value=lessons.titles()[0])
         m = tk.Menu(self.root)
+        # --- Lekce: sylabus kurzu po blocích (radio) ---
+        les_menu = tk.Menu(m, tearoff=0)
+        for name, les_list in lessons.blocks():
+            sub = tk.Menu(les_menu, tearoff=0)
+            for les in les_list:
+                sub.add_radiobutton(label=les["title"], value=les["title"],
+                                    variable=self.lesson, command=self.apply_lesson)
+            les_menu.add_cascade(label=name, menu=sub)
+        m.add_cascade(label="Lekce", menu=les_menu)
         play = tk.Menu(m, tearoff=0)
         self.port_menu = tk.Menu(play, tearoff=0)
         self._fill_ports()

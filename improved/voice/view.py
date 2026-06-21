@@ -19,6 +19,7 @@ DOT_BASS = "#1f7ae0"
 DOT_MEL = "#e8731e"          # melodický tón ZE STUPNICE (diatonický)
 DOT_CHROM = "#a23bd6"       # chromatický approach (MIMO stupnici) -- fialově, vizuálně odlišeno
 VL_LINE = "#1f7ae0"
+VL_LIGHT = "#bcd8f5"         # držený společný tón LH (voice se nehýbe) -- světlá čára
 ROOT_YEL = "#f0c020"        # naznačený (vynechaný) root u rootless voicingu -- žlutě, bez čísla
 MUTE = "#d9d9d9"            # ztlumená vrstva (mimo fokus lekce)
 SCALE_GRN = "#bfe3c0"       # paleta tónů stupnice
@@ -194,12 +195,16 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False, focus=None):
     # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
     lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
           for i, bar in enumerate(bars)]
-    # čáry voice-leadingu MEZI BUBLINAMI voicingu (k-tý hlas akordu i -> k-tý hlas i+1)
+    # čáry voice-leadingu MEZI BUBLINAMI voicingu (k-tý hlas akordu i -> k-tý hlas i+1):
+    # DRŽENÝ společný tón (stejná nota) = SVĚTLE; skutečný PŘESUN na jinou notu = plná barva.
     vlw = 4 if fl["voicing"] else 2                          # fokus 'voicing' -> zvýrazni vedení LH
     for i in range(n - 1):
         a, b = lh[i], lh[i + 1]
+        vi, vj = sorted(bars[i].voicing), sorted(bars[i + 1].voicing)
         for k in range(min(len(a), len(b))):
-            cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=vlw)
+            held = k < len(vi) and k < len(vj) and vi[k] == vj[k]    # voice se nehýbe
+            cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1],
+                           fill=(VL_LIGHT if held else VL_LINE), width=(1 if held else vlw))
     # melodie: pozice koleček (spočti jednou -> pro spojnici i kreslení)
     mel_pos = [_seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]) if mel else []
                for i in range(n)]
