@@ -154,10 +154,22 @@ LESSONS = [
         "motion": "scale",
         "ab": {"A": {"color": "inside"}, "B": {"color": "wt"}},
     },
+    {
+        "key": "dim_pattern",
+        "title": "14 · Diminished pattern (po terciích)",
+        "explain": ("Protože se diminished opakuje po MALÉ TERCII, stejný 4-tónový útvar zní "
+                    "i o m3 níž. Dril: vzestupná buňka sekvencovaná po malých terciích dolů — "
+                    "typický bebopový diminished pohyb. A/B: rovný běh (A) vs pattern (B)."),
+        "preset": {"density": 2, "approach": 0.0, "color": "dim", "voicing": "rootless",
+                   "chords": "A7 D7 G7 C7"},
+        "focus": "scale",
+        "motion": "thirds",
+        "ab": {"A": {"motion": "scale"}, "B": {"motion": "thirds"}},
+    },
     # --- Blok G: blues / pentatonika ---
     {
         "key": "blues_pent",
-        "title": "14 · Blues / pentatonika",
+        "title": "15 · Blues / pentatonika",
         "explain": ("Jedna stupnice přes CELÉ změny: mollová pentatonika (1 ♭3 4 5 ♭7) + blue "
                     "note (♭5) = bluesová stupnice. Funguje nad celým blues, není nutné měnit "
                     "stupnici po akordech. A/B: pentatonika (A) vs blues s ♭5 (B) — slyš blue note."),
@@ -177,7 +189,7 @@ BLOCKS = [
     ("C · Ozdoby", ["approach", "enclosure", "bebop_scale"]),
     ("D · Levá ruka", ["voice_leading", "voicing_textures"]),
     ("E · Moll", ["minor_ii_v_i"]),
-    ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom"]),
+    ("F · Barevné stupnice", ["diminished_dom", "whole_tone_dom", "dim_pattern"]),
     ("G · Blues / pentatonika", ["blues_pent"]),
 ]
 

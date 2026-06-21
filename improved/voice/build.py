@@ -107,6 +107,25 @@ def generate(harmony, density=2, seed=1, approach=0.5, enclose=0.0, motion="arp"
                 if nx < 0 or nx >= len(sc):                    # odraz dovnitř stupnice
                     dd = -dd; nx = cur + dd
                 cur = nx
+        elif motion == "thirds":
+            # PATTERN PO MALÝCH TERCIÍCH: 4-tónová vzestupná buňka, sekvencovaná o m3 níž
+            # (= 2 indexy v symetrické stupnici) -> typický diminished pattern (ukáže symetrii).
+            cell = 4
+            groups = max(1, npb // cell)
+            root_pc = bar.root % 12
+            roots = [k for k, s in enumerate(sc) if s % 12 == root_pc]
+            fit = [k for k in roots if k - (groups - 1) * 2 >= 0 and k + cell - 1 < len(sc)]
+            si = (fit[-1] if fit else (roots[-1] if roots
+                  else min(range(len(sc)), key=lambda k: abs(sc[k] - entry))))
+            fallback = sc[si]
+            pos, n = {}, 0
+            for gp in range(groups):                            # každá buňka o m3 níž
+                base = si - gp * 2
+                for j in range(cell):
+                    if n < npb:
+                        pos[n] = sc[max(0, min(len(sc) - 1, base + j))]; n += 1
+            while n < npb:
+                pos[n] = fallback; n += 1
         else:
             # CÍLE na doby = akordové arpeggio v jednom směru (odraz od kraje, bez duplikace)
             ci = min(range(len(ct)), key=lambda k: abs(ct[k] - entry))
