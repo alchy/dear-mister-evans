@@ -85,12 +85,16 @@ def _dot(cv, x, y, r, **kw):
 
 
 def _seq_pos(g, x0, ky, lo, hi, seq):
-    """Pozice (cx,cy) bublin v pořadí hraní -- dráhové schodiště (patro výš při
-    opakování/změně směru). Vrací seznam pozic (kreslení dělá _dots)."""
+    """Pozice (cx,cy) bublin v pořadí hraní -- dráhové schodiště. Řada (level) jde
+    JEN NAHORU (monotónně): patro výš při opakování/změně směru A při přechodu
+    BÍLÁ->ČERNÁ klapka (tón na černé tak sedí výš, na černé klapce). Černá->bílá
+    zůstává na dosažené řadě. Vrací seznam pozic (kreslení dělá _dots)."""
     base = ky + g.WH - g.WW * 0.6
     level, prevdir = 0, 0
+    prev_black = False                                 # "před začátkem" = bílá
     out = []
     for i, p in enumerate(seq):
+        cur_black = (p % 12) in BLACK
         if i > 0:
             prev = seq[i - 1]
             d = (p > prev) - (p < prev)
@@ -98,6 +102,9 @@ def _seq_pos(g, x0, ky, lo, hi, seq):
                 level = min(MAXL, level + 1)
             if d != 0:
                 prevdir = d
+        if (not prev_black) and cur_black:             # bílá -> černá: o řadu výš (na černou)
+            level = min(MAXL, level + 1)
+        prev_black = cur_black
         out.append((_cx(g, x0, lo, hi, p), base - level * g.STEP))
     return out
 
