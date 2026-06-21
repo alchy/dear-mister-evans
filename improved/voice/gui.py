@@ -13,9 +13,9 @@ import tkinter as tk
 from tkinter import ttk
 import mido
 
-from voice.harmony import Harmony, TEMPLATES
+from voice.harmony import Harmony
 from voice.render import to_midi
-from voice import build, view
+from voice import build, view, progressions as prog
 
 
 def default_port(names):
@@ -31,81 +31,89 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title("voice — čistý generátor")
-        root.resizable(False, False)
+        root.resizable(True, True)                 # okno zvětšitelné -> klávesnice škáluje
         self.stop = threading.Event()
         self.worker = None
         self.preview = os.path.join(tempfile.gettempdir(), "voice_preview.mid")
+        self._draw_state = None                    # (harmony, landings, line) pro překreslení
+        self._resize_job = None
         self._build()
 
     def _build(self):
-        # dvoupanelový layout: VLEVO settings, VPRAVO klaviatura/náhled
-        outer = ttk.Frame(self.root, padding=10)
-        outer.grid(sticky="nsew")
-        left = ttk.Frame(outer)
-        left.grid(row=0, column=0, sticky="n")
-        ttk.Separator(outer, orient="vertical").grid(row=0, column=1, sticky="ns", padx=10)
+        # dvoupanelový layout: VLEVO stavebnice cvičení, VPRAVO klaviatura/náhled (škáluje)
+        self.root.rowconfigure(0, weight=1); self.root.columnconfigure(0, weight=1)
+        outer = ttk.Frame(self.root, padding=8)
+        outer.grid(row=0, column=0, sticky="nsew")
+        outer.rowconfigure(0, weight=1); outer.columnconfigure(2, weight=1)
+        left = ttk.Frame(outer); left.grid(row=0, column=0, sticky="n")
+        ttk.Separator(outer, orient="vertical").grid(row=0, column=1, sticky="ns", padx=8)
         right = ttk.LabelFrame(
             outer, padding=4,
             text="Náhled: ● levá ruka (přesun) · ● tóny stupnice · ◯ guide (3/7) · ▼ landing · — co hraje")
-        right.grid(row=0, column=2, sticky="n")
+        right.grid(row=0, column=2, sticky="nsew")
+        right.rowconfigure(0, weight=1); right.columnconfigure(0, weight=1)
         self._controls(left)
         self._preview(right)
 
     def _controls(self, f):
-        pad = {"padx": 5, "pady": 4}
-        r = 0
-        names = mido.get_output_names() or [""]
-        ttk.Label(f, text="MIDI port:").grid(row=r, column=0, sticky="w", **pad)
-        self.port = tk.StringVar(value=default_port(names))
-        self.port_menu = ttk.OptionMenu(f, self.port, self.port.get(), *names)
-        self.port_menu.grid(row=r, column=1, columnspan=2, sticky="we", **pad)
-        ttk.Button(f, text="⟳", width=3, command=self.refresh_ports).grid(row=r, column=3, **pad)
-        r += 1
+        pad = {"padx": 4, "pady": 3}
+        # === Progrese — stavebnice cvičení ===
+        g = ttk.LabelFrame(f, text="Progrese — stavebnice cvičení", padding=6)
+        g.grid(row=0, column=0, sticky="we", pady=(0, 8))
+        ttk.Label(g, text="Tónika:").grid(row=0, column=0, sticky="w", **pad)
+        self.root_note = tk.StringVar(value="C")
+        ttk.OptionMenu(g, self.root_note, "C", *prog.NAMES,
+                       command=lambda *_: self._rebuild()).grid(row=0, column=1, sticky="we", **pad)
+        ttk.Label(g, text="Tonalita:").grid(row=0, column=2, sticky="e", **pad)
+        self.mode = tk.StringVar(value="dur")
+        ttk.OptionMenu(g, self.mode, "dur", "dur", "moll",
+                       command=lambda *_: self._on_mode()).grid(row=0, column=3, sticky="we", **pad)
+        ttk.Label(g, text="Postup:").grid(row=1, column=0, sticky="w", **pad)
+        self.pattern = tk.StringVar(value=prog.patterns("dur")[0])
+        self.pattern_menu = ttk.OptionMenu(g, self.pattern, self.pattern.get(), *prog.patterns("dur"),
+                                           command=lambda *_: self._rebuild())
+        self.pattern_menu.grid(row=1, column=1, columnspan=3, sticky="we", **pad)
+        ttk.Label(g, text="Akordy:").grid(row=2, column=0, sticky="w", **pad)
+        self.chords = tk.StringVar(value=prog.build_changes("C", "dur", self.pattern.get()))
+        ttk.Entry(g, textvariable=self.chords, width=34).grid(row=2, column=1, columnspan=3, sticky="we", **pad)
 
-        ttk.Label(f, text="Šablona:").grid(row=r, column=0, sticky="w", **pad)
-        self.template = tk.StringVar(value="ii–V–I dur (C)")
-        ttk.OptionMenu(f, self.template, self.template.get(), *TEMPLATES,
-                       command=self._set_template).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
-        r += 1
-
-        ttk.Label(f, text="Akordy:").grid(row=r, column=0, sticky="w", **pad)
-        self.chords = tk.StringVar(value=TEMPLATES["ii–V–I dur (C)"])
-        ttk.Entry(f, textvariable=self.chords, width=28).grid(row=r, column=1, columnspan=3, sticky="we", **pad)
-        r += 1
-
-        ttk.Label(f, text="Hustota:").grid(row=r, column=0, sticky="w", **pad)
+        # === Cvičení (generování) ===
+        g2 = ttk.LabelFrame(f, text="Cvičení", padding=6)
+        g2.grid(row=1, column=0, sticky="we", pady=(0, 8))
+        ttk.Label(g2, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
         self.density = tk.IntVar(value=2)
-        ttk.Spinbox(f, from_=1, to=4, textvariable=self.density, width=5).grid(row=r, column=1, sticky="w", **pad)
-        ttk.Label(f, text="BPM:").grid(row=r, column=2, sticky="e", **pad)
-        self.bpm = tk.IntVar(value=110)
-        ttk.Spinbox(f, from_=40, to=240, textvariable=self.bpm, width=6).grid(row=r, column=3, sticky="w", **pad)
-        r += 1
-
-        ttk.Label(f, text="Seed:").grid(row=r, column=0, sticky="w", **pad)
-        self.seed = tk.IntVar(value=1)
-        ttk.Spinbox(f, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=r, column=1, sticky="w", **pad)
-        ttk.Label(f, text="Approach:").grid(row=r, column=2, sticky="e", **pad)
+        ttk.Spinbox(g2, from_=1, to=4, textvariable=self.density, width=5).grid(row=0, column=1, sticky="w", **pad)
+        ttk.Label(g2, text="Approach:").grid(row=0, column=2, sticky="e", **pad)
         self.approach = tk.DoubleVar(value=0.7)
-        ttk.Spinbox(f, from_=0.0, to=1.0, increment=0.1, textvariable=self.approach, width=6).grid(
-            row=r, column=3, sticky="w", **pad)
-        r += 1
-
-        ttk.Label(f, text="Barva (V→moll):").grid(row=r, column=0, sticky="w", **pad)
+        ttk.Spinbox(g2, from_=0.0, to=1.0, increment=0.1, textvariable=self.approach, width=5).grid(
+            row=0, column=3, sticky="w", **pad)
+        ttk.Label(g2, text="Barva (V→moll):").grid(row=1, column=0, sticky="w", **pad)
         self.color = tk.StringVar(value="inside")
-        ttk.OptionMenu(f, self.color, self.color.get(), "inside", "outside").grid(
-            row=r, column=1, sticky="w", **pad)
-        r += 1
+        ttk.OptionMenu(g2, self.color, "inside", "inside", "outside").grid(row=1, column=1, sticky="w", **pad)
+        ttk.Label(g2, text="BPM:").grid(row=1, column=2, sticky="e", **pad)
+        self.bpm = tk.IntVar(value=110)
+        ttk.Spinbox(g2, from_=40, to=240, textvariable=self.bpm, width=5).grid(row=1, column=3, sticky="w", **pad)
+        ttk.Label(g2, text="Seed:").grid(row=2, column=0, sticky="w", **pad)
+        self.seed = tk.IntVar(value=1)
+        ttk.Spinbox(g2, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=1, sticky="w", **pad)
 
-        btns = ttk.Frame(f)
-        btns.grid(row=r, column=0, columnspan=4, sticky="we", pady=8)
-        ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=3)
-        ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=3)
-        ttk.Button(btns, text="🎲 Seed", command=self.on_reseed).pack(side="left", padx=3)
-        r += 1
+        # === Přehrávání ===
+        g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
+        g3.grid(row=2, column=0, sticky="we")
+        ttk.Label(g3, text="MIDI port:").grid(row=0, column=0, sticky="w", **pad)
+        names = mido.get_output_names() or [""]
+        self.port = tk.StringVar(value=default_port(names))
+        self.port_menu = ttk.OptionMenu(g3, self.port, self.port.get(), *names)
+        self.port_menu.grid(row=0, column=1, columnspan=2, sticky="we", **pad)
+        ttk.Button(g3, text="⟳", width=3, command=self.refresh_ports).grid(row=0, column=3, **pad)
+        btns = ttk.Frame(g3); btns.grid(row=1, column=0, columnspan=4, sticky="we", pady=6)
+        ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=2)
+        ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=2)
+        ttk.Button(btns, text="🎲", width=3, command=self.on_reseed).pack(side="left", padx=2)
 
-        self.status = tk.StringVar(value="Připraveno. (builder cíl+spojka)")
-        ttk.Label(f, textvariable=self.status, foreground="#246", width=34, anchor="w",
-                  wraplength=260).grid(row=r, column=0, columnspan=4, sticky="w", **pad)
+        self.status = tk.StringVar(value="Připraveno. (stavebnice cíl+spojka)")
+        ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
+                  wraplength=300).grid(row=3, column=0, sticky="we", pady=(8, 0))
 
     def _preview(self, f):
         self.canvas = tk.Canvas(f, width=820, height=680, bg="#fafafa", highlightthickness=0)
@@ -113,6 +121,36 @@ class App:
         self.canvas.configure(yscrollcommand=sb.set)
         self.canvas.grid(row=0, column=0, sticky="nsew")
         sb.grid(row=0, column=1, sticky="ns")
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+
+    def _on_mode(self):
+        pats = prog.patterns(self.mode.get())                 # přepiš nabídku postupů dle tonality
+        m = self.pattern_menu["menu"]; m.delete(0, "end")
+        for p in pats:
+            m.add_command(label=p, command=lambda v=p: (self.pattern.set(v), self._rebuild()))
+        if self.pattern.get() not in pats:
+            self.pattern.set(pats[0])
+        self._rebuild()
+
+    def _rebuild(self):
+        self.chords.set(prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
+        self.status.set(f"Postup: {self.root_note.get()} {self.mode.get()} · {self.pattern.get()}")
+
+    def _on_canvas_resize(self, event):
+        if self._draw_state is None:
+            return
+        if self._resize_job:
+            try:
+                self.root.after_cancel(self._resize_job)
+            except Exception:
+                pass
+        self._resize_job = self.root.after(120, self._redraw)
+
+    def _redraw(self):
+        self._resize_job = None
+        if self._draw_state:
+            H, land, line = self._draw_state
+            view.draw(self.canvas, H, land, line, width=self.canvas.winfo_width())
 
     def refresh_ports(self):
         names = mido.get_output_names() or [""]
@@ -123,11 +161,6 @@ class App:
         if self.port.get() not in names:
             self.port.set(default_port(names))
         self.status.set(f"Porty obnoveny ({len(names)}).")
-
-    def _set_template(self, name):
-        if name in TEMPLATES:
-            self.chords.set(TEMPLATES[name])
-            self.status.set(f"Šablona: {name}")
 
     def on_reseed(self):
         self.seed.set((self.seed.get() + 1) % 10000)
@@ -152,7 +185,8 @@ class App:
                                   seed=self.seed.get(), approach=self.approach.get())
             _, landings = build.guide_path(H)
             to_midi(H, line, self.preview, bpm=self.bpm.get(), density=self.density.get())
-            self.root.after(0, lambda: view.draw(self.canvas, H, landings, line))   # tabule
+            self._draw_state = (H, landings, line)             # ulož pro responzivní překreslení
+            self.root.after(0, self._redraw)
             self.status.set(f"Hraji…  {len(H)} akordů, {len(line)} not")
             self._play_follow(self.preview, len(H))
             if not self.stop.is_set():
