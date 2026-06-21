@@ -157,27 +157,18 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                      outline="#2a9d3a", width=2, fill="")
         cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
-    # 1) levá ruka. Rootless = root jen NAZNAČENÝ (bas) -> žlutě bez čísla; číslují se
-    #    jen reálné tóny voicingu. Rooted = vše číslované ([bas]+voicing).
-    lh_seq = []
-    for bar in bars:
-        voic = sorted(bar.voicing)
-        rootless = (bar.root % 12) not in [p % 12 for p in voic]
-        lh_seq.append((voic if rootless else [bar.bass] + voic, rootless))
-    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, seq)
-          for i, (seq, _) in enumerate(lh_seq)]
-    # čáry voice-leadingu MEZI BUBLINAMI (k-tý hlas akordu i -> k-tý hlas i+1)
+    # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
+    lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
+          for i, bar in enumerate(bars)]
+    # čáry voice-leadingu MEZI BUBLINAMI voicingu (k-tý hlas akordu i -> k-tý hlas i+1)
     for i in range(n - 1):
         a, b = lh[i], lh[i + 1]
         for k in range(min(len(a), len(b))):
             cv.create_line(a[k][0], a[k][1], b[k][0], b[k][1], fill=VL_LINE, width=2)
-    # kolečka navrch: žlutý naznačený root (bez čísla) + číslované voicingy + melodie
+    # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
-        seq, rootless = lh_seq[i]
-        if rootless:
-            base = y0_of(i) + g.LBL + g.WH - g.WW * 0.6
-            _dot(cv, _cx(g, 0, g.bass_lo, g.bass_hi, bar.bass), base, g.DOTR,
-                 fill=ROOT_YEL, outline="#a80")
+        bx, by = _seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
+        _dot(cv, bx, by, g.DOTR, fill=ROOT_YEL, outline="#a80")
         _dots(cv, g, lh[i], DOT_BASS)
         if mel:
             _dots(cv, g, _seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]), DOT_MEL)
