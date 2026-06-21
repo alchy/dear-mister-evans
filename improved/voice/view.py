@@ -160,12 +160,13 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
                 _dot(cv, _cx(g, g.mel_x0, MEL_LO, MEL_HI, p), baseM, g.DOTR * 0.7,
                      outline="#2a9d3a", width=2, fill="")
         lx = _cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i])               # 3) landing značka
+        af = max(10, g.fnum + 2)
         cv.create_text(lx, ky - 1, text=("▲" if flip else "▼"),  # ukazuje k řádku dalšího akordu
-                       fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
+                       fill="#e23030", font=("Segoe UI", af, "bold"))
         nxt = bars[(i + 1) % n]                                           # akord, do kterého se míří
         iv = (landings[i] - nxt.root) % 12                               # guide tón = 3 nebo 7 cíle
         deg = "3" if iv in (3, 4) else "7" if iv in (9, 10, 11) else "?"
-        cv.create_text(lx + g.WW * 0.5, ky - 1, anchor="w",             # popisek: tón (3/7·akord)
+        cv.create_text(lx, ky - 1 - af, anchor="s",                     # popisek NAD šipkou (mimo klávesy)
                        text=f"{_PC[landings[i] % 12]} ({deg}·{_sym(nxt)})",
                        fill="#e23030", font=("Segoe UI", g.flbl, "bold"))
     # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
