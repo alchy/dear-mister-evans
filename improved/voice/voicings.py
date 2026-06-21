@@ -14,11 +14,15 @@ Typy (kind):
 """
 import itertools
 
-KINDS = ["root", "root_vl", "drop2", "drop3", "drop24", "rootless", "cluster"]
+KINDS = ["root", "root_vl", "drop2", "drop3", "drop24", "rootless",
+         "cluster", "cluster2", "cluster3"]
 LABELS = {
     "root": "základní tvar (fix)", "root_vl": "základní + posun (voice-led)",
     "drop2": "drop 2", "drop3": "drop 3", "drop24": "drop 2&4",
-    "rootless": "Evans rootless (A/B)", "cluster": "cluster",
+    "rootless": "Evans rootless (A/B)",
+    "cluster": "cluster I · tenze (3-5-7-9/13)",
+    "cluster2": "cluster II · akordové (3-5-7-9)",
+    "cluster3": "cluster III · stupnicový (sekundy)",
 }
 
 # offsety chord-tónů od základu
@@ -29,6 +33,17 @@ SEV = {  # R 3 5 7
 RLESS = {  # 3 5 7 9  (Evans); m7b5/dim ROOTLESS: b3 b5 b7 9 (žádný root)
     "maj7": [4, 7, 11, 2], "6": [4, 7, 9, 2], "m7": [3, 7, 10, 2], "m6": [3, 7, 9, 2],
     "mmaj7": [3, 7, 11, 2], "7": [4, 10, 2, 9], "m7b5": [3, 6, 10, 2], "dim7": [3, 6, 9, 2],
+}
+CT9 = {**RLESS, "7": [4, 7, 10, 2]}     # 3-5-7-9 pro VŠECHNY kvality (dominanta bez 13 -> vždy těsný)
+SCALE = {  # default chord-scale dle kvality (pro stupnicový cluster III)
+    "maj7": [0, 2, 4, 5, 7, 9, 11],     # ionská
+    "6": [0, 2, 4, 5, 7, 9, 11],        # ionská
+    "m7": [0, 2, 3, 5, 7, 9, 10],       # dórská
+    "m6": [0, 2, 3, 5, 7, 9, 11],       # melodická moll
+    "mmaj7": [0, 2, 3, 5, 7, 9, 11],    # melodická moll
+    "7": [0, 2, 4, 5, 7, 9, 10],        # mixolydická
+    "m7b5": [0, 2, 3, 5, 6, 8, 10],     # lokrická ♮2
+    "dim7": [0, 2, 3, 5, 6, 8, 9, 11],  # zmenšená (celá-půl)
 }
 REF = 58            # rejstřík voicingu (vrch ~ C4); bas je zvlášť dole
 
@@ -80,6 +95,20 @@ def _cluster(offs, root, ref):
     return best[1]
 
 
+def _scale_cluster(root, q, ref):
+    """Stupnicový tone-cluster: nejtěsnější blok 4 SOUSEDNÍCH stupnicových tónů."""
+    scl = SCALE.get(q, SCALE["maj7"])
+    nn = len(scl)
+    best = None
+    for s in range(nn):
+        win = [scl[(s + k) % nn] for k in range(4)]    # 4 sousední stupnicové tóny
+        v = _stack(win, root, ref)
+        span = max(v) - min(v)
+        if best is None or span < best[0]:
+            best = (span, sorted(v))
+    return best[1]
+
+
 def _place_near(pc, target):
     d = (pc - target) % 12
     return target + (d - 12 if d > 6 else d)
@@ -120,7 +149,11 @@ def voicing_for(root, quality, kind, prev=None, ref=REF):
     # tvarově PEVNÉ typy (drží strukturu): centruj do STÁLÉHO rejstříku (ref) -> statický,
     # bez driftu (nevedou se k předchozímu, takže klaviatura "neutíká").
     if kind == "cluster":
-        v = _cluster(RLESS[q], root, ref)
+        v = _cluster(RLESS[q], root, ref)               # I: tenze (3-5-7-9/13)
+    elif kind == "cluster2":
+        v = _cluster(CT9[q], root, ref)                 # II: akordové (3-5-7-9, dominanta bez 13)
+    elif kind == "cluster3":
+        v = _scale_cluster(root, q, ref)                # III: stupnicový (4 sousední stupnicové tóny)
     elif kind in ("drop2", "drop3", "drop24"):
         v = _drop(_stack(SEV[q], root, ref), kind)
     else:  # root (fix)
