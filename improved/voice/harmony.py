@@ -14,7 +14,7 @@ for _p in (_ROOT, os.path.join(_ROOT, "..", "concept", "evans_melody_gen")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import voicings as V
+from voice import voicings as Vc
 from arrange_chords import parse_symbol
 
 # --- akordové tóny (půltóny od kořene): 1, 3, 5, 7 ---
@@ -87,14 +87,13 @@ class Harmony:
     """Progrese (string/[(root,q)]) -> [Bar]. Chord-scale dle FUNKCE (kontextově,
     z následujícího akordu). color = 'inside' | 'outside' (napětí dominant->moll)."""
     def __init__(self, progression, lo=55, hi=88, center=None, color="inside",
-                 voicing="rootless", voicing_center=52):
-        # center = referenční rejstřík MELODIE; voicing_center = kam staví LEVÁ ruka
-        # (níž, ~C3-E4, ať se 4-tónový voicing vejde do bas klaviatury náhledu).
+                 voicing="rootless"):
+        # center = referenční rejstřík MELODIE; voicing = TYP rozložení LH (viz voicings).
         self.lo, self.hi = lo, hi
         self.center = center if center is not None else (lo + hi) // 2
         self.color = color
         prog = self._parse(progression)
-        voics = V.generate_voicings(prog, center=voicing_center, style=voicing)
+        voics = Vc.generate(prog, kind=voicing)
         self.bars = []
         for i, (root, q) in enumerate(prog):
             nr, nq = prog[(i + 1) % len(prog)]

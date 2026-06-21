@@ -15,7 +15,7 @@ import mido
 
 from voice.harmony import Harmony
 from voice.render import to_midi
-from voice import build, view, progressions as prog
+from voice import build, view, progressions as prog, voicings as voi
 
 
 def default_port(names):
@@ -97,10 +97,10 @@ class App:
         ttk.Label(g2, text="Seed:").grid(row=2, column=0, sticky="w", **pad)
         self.seed = tk.IntVar(value=1)
         ttk.Spinbox(g2, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=1, sticky="w", **pad)
-        ttk.Label(g2, text="Rozložení:").grid(row=2, column=2, sticky="e", **pad)
-        self.voicing = tk.StringVar(value="rootless")
-        ttk.OptionMenu(g2, self.voicing, "rootless", "rootless", "basic", "color").grid(
-            row=2, column=3, sticky="w", **pad)
+        ttk.Label(g2, text="Rozložení LH:").grid(row=3, column=0, sticky="w", **pad)
+        self.voicing = tk.StringVar(value=voi.LABELS["rootless"])
+        ttk.OptionMenu(g2, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
+            row=3, column=1, columnspan=3, sticky="we", **pad)
 
         # === Přehrávání ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
@@ -256,7 +256,8 @@ class App:
     def _work_generate(self):
         try:
             self.status.set("Generuji…")
-            H = Harmony(self.chords.get(), color=self.color.get(), voicing=self.voicing.get())
+            kind = {v: k for k, v in voi.LABELS.items()}.get(self.voicing.get(), "rootless")
+            H = Harmony(self.chords.get(), color=self.color.get(), voicing=kind)
             line = build.generate(H, density=self.density.get(),
                                   seed=self.seed.get(), approach=self.approach.get())
             _, landings = build.guide_path(H)
