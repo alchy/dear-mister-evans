@@ -159,7 +159,8 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
             if MEL_LO <= p <= MEL_HI:
                 _dot(cv, _cx(g, g.mel_x0, MEL_LO, MEL_HI, p), baseM, g.DOTR * 0.7,
                      outline="#2a9d3a", width=2, fill="")
-        cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1, text="▼",   # 3) landing
+        cv.create_text(_cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i]), ky - 1,   # 3) landing značka
+                       text=("▲" if flip else "▼"),    # ukazuje k řádku dalšího akordu (flip-aware)
                        fill="#e23030", font=("Segoe UI", max(10, g.fnum + 2), "bold"))
     # 1) levá ruka (DRY): BAS (root) VŽDY žlutě BEZ čísla; číslují se jen tóny voicingu.
     lh = [_seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, sorted(bar.voicing))
@@ -172,15 +173,15 @@ def draw(cv, harmony, landings, line=None, width=None, flip=False):
     # melodie: pozice koleček (spočti jednou -> pro spojnici i kreslení)
     mel_pos = [_seq_pos(g, g.mel_x0, y0_of(i) + g.LBL, MEL_LO, MEL_HI, mel[i]) if mel else []
                for i in range(n)]
-    # LANDING-spojnice: ▼ taktu i -> PRVNÍ kolečko taktu i+1 (kam se dosedne v dalším akordu)
+    # LANDING-šipka: POSLEDNÍ (approach) tón taktu i -> PRVNÍ (landing) tón taktu i+1.
+    # Krátká, v mezeře mezi řádky; hrot u landing noty -> jasně směrová a otáčí se s flipem.
     if mel:
         for i in range(n - 1):
-            if mel_pos[i + 1]:
-                vx = _cx(g, g.mel_x0, MEL_LO, MEL_HI, landings[i])
-                vy = y0_of(i) + g.LBL - 1
-                nx, ny = mel_pos[i + 1][0]
-                cv.create_line(vx, vy, nx, ny, fill="#e23030", width=1, dash=(3, 2),
-                               arrow="last")          # hrot u landing noty (odráží flip)
+            if mel_pos[i] and mel_pos[i + 1]:
+                fx, fy = mel_pos[i][-1]
+                tx, ty = mel_pos[i + 1][0]
+                cv.create_line(fx, fy, tx, ty, fill="#e23030", width=1, dash=(3, 2),
+                               arrow="last")
     # kolečka navrch: žlutý naznačený bas/root (bez čísla) + číslované tóny voicingu + melodie
     for i, bar in enumerate(bars):
         bx, by = _seq_pos(g, 0, y0_of(i) + g.LBL, g.bass_lo, g.bass_hi, [bar.bass])[0]
