@@ -11,7 +11,7 @@ Zelená linka = právě hraný řádek. Velikost kláves se počítá z šířky
 from types import SimpleNamespace
 
 BLACK = {1, 3, 6, 8, 10}
-PAD = 6
+PAD = 20                          # horní/levý okraj -- místo pro landing popisek nad 1. řádkem
 MAXL = 3
 BASS_LO, BASS_HI = 36, 64        # C2..E4 (bas + voicing)
 MEL_LO, MEL_HI = 55, 88          # G3..E6 (melodie)
