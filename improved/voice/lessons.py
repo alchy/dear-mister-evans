@@ -129,6 +129,16 @@ LESSONS = [
 ]
 
 
+# bloky kurikula (sylabus): název -> klíče lekcí v pořadí
+BLOCKS = [
+    ("A · Cíle", ["guide_tones", "chord_tones_beat", "landing"]),
+    ("B · Stupnice", ["chord_scales", "inside_outside"]),
+    ("C · Ozdoby", ["approach", "enclosure", "bebop_scale"]),
+    ("D · Levá ruka", ["voice_leading", "voicing_textures"]),
+    ("E · Moll", ["minor_ii_v_i"]),
+]
+
+
 def titles():
     return [l["title"] for l in LESSONS]
 
@@ -138,3 +148,15 @@ def by_title(t):
         if l["title"] == t:
             return l
     return LESSONS[0]
+
+
+def by_key(k):
+    for l in LESSONS:
+        if l["key"] == k:
+            return l
+    return LESSONS[0]
+
+
+def blocks():
+    """[(název bloku, [lekce...])] pro sylabus."""
+    return [(name, [by_key(k) for k in keys]) for name, keys in BLOCKS]

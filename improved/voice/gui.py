@@ -48,36 +48,53 @@ class App:
         root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build(self):
-        # dvoupanelový layout: VLEVO stavebnice cvičení, VPRAVO klaviatura/náhled (škáluje)
+        # VLEVO sdílený panel (sylabus + kontext + přehrávání), VPRAVO tabule: hlavička lekce + náhled.
         self.root.rowconfigure(0, weight=1); self.root.columnconfigure(0, weight=1)
         outer = ttk.Frame(self.root, padding=8)
         outer.grid(row=0, column=0, sticky="nsew")
         outer.rowconfigure(0, weight=1); outer.columnconfigure(2, weight=1)
         left = ttk.Frame(outer); left.grid(row=0, column=0, sticky="n")
         ttk.Separator(outer, orient="vertical").grid(row=0, column=1, sticky="ns", padx=8)
-        right = ttk.LabelFrame(
-            outer, padding=4,
+        right = ttk.Frame(outer); right.grid(row=0, column=2, sticky="nsew")
+        right.rowconfigure(1, weight=1); right.columnconfigure(0, weight=1)
+        self._lesson_header(right)                         # row 0 = výklad lekce + A/B
+        prev = ttk.LabelFrame(
+            right, padding=4,
             text="Náhled: ● levá ruka · ● melodie (stupnice) · ● chromatický approach · ◯ guide (3/7) · ▼ landing · — co hraje")
-        right.grid(row=0, column=2, sticky="nsew")
-        right.rowconfigure(0, weight=1); right.columnconfigure(0, weight=1)
+        prev.grid(row=1, column=0, sticky="nsew")
+        prev.rowconfigure(0, weight=1); prev.columnconfigure(0, weight=1)
         self._controls(left)
-        self._preview(right)
+        self._preview(prev)
+
+    def _lesson_header(self, parent):
+        """Tabule: titul lekce + výklad + A/B (vpravo nahoře nad náhledem)."""
+        les0 = lessons.LESSONS[0]
+        band = ttk.Frame(parent); band.grid(row=0, column=0, sticky="we", pady=(0, 6))
+        band.columnconfigure(0, weight=1)
+        self.lesson_title = tk.StringVar(value=les0["title"])
+        ttk.Label(band, textvariable=self.lesson_title, font=("Segoe UI", 13, "bold"),
+                  foreground="#234").grid(row=0, column=0, sticky="w")
+        ttk.Button(band, text="▶ A/B (slyš rozdíl)", command=self.on_ab).grid(row=0, column=1, sticky="e", padx=4)
+        self.explain = tk.StringVar(value=les0["explain"])
+        ttk.Label(band, textvariable=self.explain, foreground="#345", anchor="w", justify="left",
+                  wraplength=760).grid(row=1, column=0, columnspan=2, sticky="we", pady=(2, 0))
 
     def _controls(self, f):
         pad = {"padx": 4, "pady": 3}
-        # === Lekce (virtuální Levine) ===
-        gl = ttk.LabelFrame(f, text="Lekce", padding=6)
-        gl.grid(row=0, column=0, sticky="we", pady=(0, 8))
+        # === KURZ — sylabus lekcí (po blocích) ===
+        gk = ttk.LabelFrame(f, text="KURZ — lekce", padding=4)
+        gk.grid(row=0, column=0, sticky="we", pady=(0, 8))
         self.lesson = tk.StringVar(value=lessons.titles()[0])
-        ttk.OptionMenu(gl, self.lesson, self.lesson.get(), *lessons.titles(),
-                       command=self.apply_lesson).grid(row=0, column=0, sticky="we", **pad)
-        ttk.Button(gl, text="▶ A/B (slyš rozdíl)", command=self.on_ab).grid(row=0, column=1, **pad)
-        self.explain = tk.StringVar(value=lessons.LESSONS[0]["explain"])
-        ttk.Label(gl, textvariable=self.explain, foreground="#345", anchor="w", justify="left",
-                  wraplength=320).grid(row=1, column=0, columnspan=2, sticky="we", **pad)
+        r = 0
+        for name, les_list in lessons.blocks():
+            ttk.Label(gk, text=name, font=("Segoe UI", 9, "bold"), foreground="#777").grid(
+                row=r, column=0, sticky="w", padx=2, pady=(4, 0)); r += 1
+            for les in les_list:
+                ttk.Radiobutton(gk, text=les["title"], value=les["title"], variable=self.lesson,
+                                command=self.apply_lesson).grid(row=r, column=0, sticky="w", padx=(14, 2)); r += 1
 
-        # === Progrese — stavebnice cvičení ===
-        g = ttk.LabelFrame(f, text="Progrese — stavebnice cvičení", padding=6)
+        # === Progrese (sdílený kontext cvičení) ===
+        g = ttk.LabelFrame(f, text="Progrese", padding=6)
         g.grid(row=1, column=0, sticky="we", pady=(0, 8))
         ttk.Label(g, text="Tónika:").grid(row=0, column=0, sticky="w", **pad)
         self.root_note = tk.StringVar(value="C")
@@ -92,62 +109,74 @@ class App:
         self.pattern_menu = ttk.OptionMenu(g, self.pattern, self.pattern.get(), *prog.patterns("dur"),
                                            command=lambda *_: self._rebuild())
         self.pattern_menu.grid(row=1, column=1, columnspan=3, sticky="we", **pad)
-        ttk.Label(g, text="Akordy:").grid(row=2, column=0, sticky="w", **pad)
-        self.chords = tk.StringVar(value=prog.build_changes("C", "dur", self.pattern.get()))
-        ttk.Entry(g, textvariable=self.chords, width=34).grid(row=2, column=1, columnspan=3, sticky="we", **pad)
 
-        # === Cvičení (generování) ===
-        g2 = ttk.LabelFrame(f, text="Cvičení", padding=6)
-        g2.grid(row=2, column=0, sticky="we", pady=(0, 8))
-        ttk.Label(g2, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
-        self.density = tk.IntVar(value=2)
-        ttk.Spinbox(g2, from_=1, to=4, textvariable=self.density, width=5).grid(row=0, column=1, sticky="w", **pad)
-        ttk.Label(g2, text="Approach:").grid(row=0, column=2, sticky="e", **pad)
-        self.approach = tk.DoubleVar(value=0.7)
-        ttk.Spinbox(g2, from_=0.0, to=1.0, increment=0.1, textvariable=self.approach, width=5).grid(
-            row=0, column=3, sticky="w", **pad)
-        ttk.Label(g2, text="Barva (V→moll):").grid(row=1, column=0, sticky="w", **pad)
-        self.color = tk.StringVar(value="inside")
-        ttk.OptionMenu(g2, self.color, "inside", "inside", "outside").grid(row=1, column=1, sticky="w", **pad)
-        ttk.Label(g2, text="BPM:").grid(row=1, column=2, sticky="e", **pad)
-        self.bpm = tk.IntVar(value=110)
-        ttk.Spinbox(g2, from_=40, to=240, textvariable=self.bpm, width=5).grid(row=1, column=3, sticky="w", **pad)
-        ttk.Label(g2, text="Seed:").grid(row=2, column=0, sticky="w", **pad)
-        self.seed = tk.IntVar(value=1)
-        ttk.Spinbox(g2, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=1, sticky="w", **pad)
-        ttk.Label(g2, text="Rozložení LH:").grid(row=3, column=0, sticky="w", **pad)
-        self.voicing = tk.StringVar(value=voi.LABELS["rootless"])
-        ttk.OptionMenu(g2, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
-            row=3, column=1, columnspan=3, sticky="we", **pad)
-        ttk.Label(g2, text="Obklíčení:").grid(row=4, column=0, sticky="w", **pad)
-        self.enclose = tk.DoubleVar(value=0.0)
-        ttk.Spinbox(g2, from_=0.0, to=1.0, increment=0.1, textvariable=self.enclose, width=5).grid(
-            row=4, column=1, sticky="w", **pad)
-        self.bebop = tk.BooleanVar(value=False)
-        ttk.Checkbutton(g2, text="Bebop stupnice", variable=self.bebop).grid(
-            row=4, column=2, columnspan=2, sticky="w", **pad)
-
-        # === Přehrávání ===
+        # === Přehrávání (sdílené) ===
         g3 = ttk.LabelFrame(f, text="Přehrávání", padding=6)
-        g3.grid(row=3, column=0, sticky="we")
+        g3.grid(row=2, column=0, sticky="we", pady=(0, 8))
         ttk.Label(g3, text="MIDI port:").grid(row=0, column=0, sticky="w", **pad)
         names = mido.get_output_names() or [""]
         self.port = tk.StringVar(value=default_port(names))
         self.port_menu = ttk.OptionMenu(g3, self.port, self.port.get(), *names)
         self.port_menu.grid(row=0, column=1, columnspan=2, sticky="we", **pad)
         ttk.Button(g3, text="⟳", width=3, command=self.refresh_ports).grid(row=0, column=3, **pad)
-        btns = ttk.Frame(g3); btns.grid(row=1, column=0, columnspan=4, sticky="we", pady=6)
+        ttk.Label(g3, text="BPM:").grid(row=1, column=0, sticky="w", **pad)
+        self.bpm = tk.IntVar(value=110)
+        ttk.Spinbox(g3, from_=40, to=240, textvariable=self.bpm, width=5).grid(row=1, column=1, sticky="w", **pad)
+        btns = ttk.Frame(g3); btns.grid(row=2, column=0, columnspan=4, sticky="we", pady=6)
         ttk.Button(btns, text="▶ Generuj a přehraj", command=self.on_play).pack(side="left", padx=2)
         ttk.Button(btns, text="■ Stop", command=self.on_stop).pack(side="left", padx=2)
-        ttk.Button(btns, text="🎲", width=3, command=self.on_reseed).pack(side="left", padx=2)
+        ttk.Button(btns, text="🎲 jiný příklad", command=self.on_reseed).pack(side="left", padx=2)
 
         self.flip = tk.BooleanVar(value=False)
         ttk.Checkbutton(f, text="obrátit pořadí náhledu (zdola nahoru)", variable=self.flip,
-                        command=self._redraw).grid(row=4, column=0, sticky="w", pady=(6, 0))
+                        command=self._redraw).grid(row=3, column=0, sticky="w", pady=(2, 0))
+
+        # === Pokročilé (generativní páky -- skryté; nastaví je lekce) ===
+        self.adv_on = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="Pokročilé (generativní páky)", variable=self.adv_on,
+                        command=self._toggle_adv).grid(row=4, column=0, sticky="w", pady=(6, 0))
+        self._advanced(f)
 
         self.status = tk.StringVar(value="Připraveno. (klik na klávesy = přehraj: vlevo akord, vpravo linka)")
         ttk.Label(f, textvariable=self.status, foreground="#246", anchor="w",
-                  wraplength=300).grid(row=5, column=0, sticky="we", pady=(6, 0))
+                  wraplength=300).grid(row=6, column=0, sticky="we", pady=(6, 0))
+
+    def _advanced(self, f):
+        """Skrytý panel generativních os -- lekce je nastaví, pokročilý uživatel ladí."""
+        pad = {"padx": 4, "pady": 3}
+        a = ttk.LabelFrame(f, text="Pokročilé — nastaví je lekce, můžeš doladit", padding=6)
+        a.grid(row=5, column=0, sticky="we", pady=(0, 4)); a.grid_remove()
+        self.adv_frame = a
+        ttk.Label(a, text="Hustota:").grid(row=0, column=0, sticky="w", **pad)
+        self.density = tk.IntVar(value=2)
+        ttk.Spinbox(a, from_=1, to=4, textvariable=self.density, width=5).grid(row=0, column=1, sticky="w", **pad)
+        ttk.Label(a, text="Approach:").grid(row=0, column=2, sticky="e", **pad)
+        self.approach = tk.DoubleVar(value=0.7)
+        ttk.Spinbox(a, from_=0.0, to=1.0, increment=0.1, textvariable=self.approach, width=5).grid(
+            row=0, column=3, sticky="w", **pad)
+        ttk.Label(a, text="Obklíčení:").grid(row=1, column=0, sticky="w", **pad)
+        self.enclose = tk.DoubleVar(value=0.0)
+        ttk.Spinbox(a, from_=0.0, to=1.0, increment=0.1, textvariable=self.enclose, width=5).grid(
+            row=1, column=1, sticky="w", **pad)
+        self.bebop = tk.BooleanVar(value=False)
+        ttk.Checkbutton(a, text="Bebop stupnice", variable=self.bebop).grid(
+            row=1, column=2, columnspan=2, sticky="w", **pad)
+        ttk.Label(a, text="Barva (V→moll):").grid(row=2, column=0, sticky="w", **pad)
+        self.color = tk.StringVar(value="inside")
+        ttk.OptionMenu(a, self.color, "inside", "inside", "outside").grid(row=2, column=1, sticky="w", **pad)
+        ttk.Label(a, text="Seed:").grid(row=2, column=2, sticky="e", **pad)
+        self.seed = tk.IntVar(value=1)
+        ttk.Spinbox(a, from_=0, to=9999, textvariable=self.seed, width=6).grid(row=2, column=3, sticky="w", **pad)
+        ttk.Label(a, text="Rozložení LH:").grid(row=3, column=0, sticky="w", **pad)
+        self.voicing = tk.StringVar(value=voi.LABELS["rootless"])
+        ttk.OptionMenu(a, self.voicing, self.voicing.get(), *voi.LABELS.values()).grid(
+            row=3, column=1, columnspan=3, sticky="we", **pad)
+        ttk.Label(a, text="Akordy:").grid(row=4, column=0, sticky="w", **pad)
+        self.chords = tk.StringVar(value=prog.build_changes(self.root_note.get(), self.mode.get(), self.pattern.get()))
+        ttk.Entry(a, textvariable=self.chords, width=30).grid(row=4, column=1, columnspan=3, sticky="we", **pad)
+
+    def _toggle_adv(self):
+        (self.adv_frame.grid if self.adv_on.get() else self.adv_frame.grid_remove)()
 
     def _preview(self, f):
         self.canvas = tk.Canvas(f, width=820, height=680, bg="#fafafa", highlightthickness=0)
@@ -191,6 +220,7 @@ class App:
         if "pattern" in p: self.pattern.set(p["pattern"])
         self._focus = les.get("focus")               # zvýrazni vrstvu lekce v náhledu
         self._rebuild()
+        self.lesson_title.set(les["title"])
         self.explain.set(les["explain"])
         self.status.set(f"Lekce: {les['title']}")
 
@@ -271,6 +301,8 @@ class App:
                 setv(k)
             if "lesson" in d:
                 les = lessons.by_title(self.lesson.get())
+                self.lesson.set(les["title"])          # normalizuj (po přečíslování titulů)
+                self.lesson_title.set(les["title"])
                 self.explain.set(les["explain"])
                 self._focus = les.get("focus")
             self.status.set("Obnoveno z minula.")
