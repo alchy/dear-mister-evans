@@ -117,16 +117,15 @@ def voicing_for(root, quality, kind, prev=None, ref=REF):
     if kind == "root_vl":
         pcs = [(root + o) % 12 for o in SEV[q]]
         return _stack(SEV[q], root, ref) if prev is None else _voice_lead(prev, pcs)
-    # tvarově PEVNÉ typy (drží strukturu, jen se transponují do rejstříku)
+    # tvarově PEVNÉ typy (drží strukturu): centruj do STÁLÉHO rejstříku (ref) -> statický,
+    # bez driftu (nevedou se k předchozímu, takže klaviatura "neutíká").
     if kind == "cluster":
         v = _cluster(RLESS[q], root, ref)
     elif kind in ("drop2", "drop3", "drop24"):
         v = _drop(_stack(SEV[q], root, ref), kind)
     else:  # root (fix)
         v = _stack(SEV[q], root, ref)
-    if kind != "root" and prev is not None:
-        v = _shift_near(v, sum(prev) / len(prev))
-    return sorted(v)
+    return sorted(_shift_near(v, ref))
 
 
 def generate(progression, kind="rootless", ref=REF):

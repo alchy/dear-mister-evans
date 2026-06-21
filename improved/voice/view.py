@@ -27,12 +27,16 @@ def whites(lo, m):
 
 
 def _bass_range(harmony):
-    """Rozsah bas klaviatury DYNAMICKY z dat -> levá ruka (bas+voicing) se vždy vejde.
-    + okraj: 2 půltóny dolů, 3 (≈klávesa) nahoru vpravo. (Voice-leading nikdy mimo.)"""
+    """Bas klaviatura: STATICKÁ základna [36, 72] (C2-C5) -> u běžných voicingů (root,
+    root_vl, rootless, cluster) je klaviatura stále stejná. Roste JEN když se LH tóny
+    nevejdou (extrémně široké drop2&4) -> klouže/roste jen v extrémech, jinak statická."""
     lh = [p for b in harmony.bars for p in [b.bass] + list(b.voicing)]
-    lo = (min(lh) - 2) if lh else BASS_LO
-    hi = (max(lh) + 3) if lh else BASS_HI
-    return max(24, lo), min(96, hi)
+    if not lh:
+        return 36, 72
+    mn, mx = min(lh), max(lh)
+    lo = 36 if mn >= 36 else mn - 1                # snap na 36; níž jen při přetečení
+    hi = 72 if mx <= 72 else mx + 1                # snap na 72; výš jen při přetečení
+    return max(24, lo), min(100, hi)
 
 
 def _geom(width, bass_lo, bass_hi):
