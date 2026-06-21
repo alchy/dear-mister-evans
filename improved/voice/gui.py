@@ -6,7 +6,7 @@ Generuj & přehraj / Stop. Náhled a ~5 os dle SPECu přibudou. Hraje balík voi
 
 Spuštění:  python improved/voice/gui.py
 """
-import os, sys, threading, tempfile, traceback
+import os, sys, json, threading, tempfile, traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))   # improved/ na path
 import tkinter as tk
@@ -38,7 +38,13 @@ class App:
         self._draw_state = None                    # (harmony, landings, line) pro překreslení
         self._bass_range = (36, 64)                # dynamický rozsah bas klaviatury (z draw)
         self._resize_job = None
+        self._loading = False
+        self._save_job = None
+        self.state_path = os.path.join(os.getcwd(), "voice_gui_state.json")
         self._build()
+        self._load_state()                         # obnov nastavení z minula
+        self._register_traces()                    # ulož při změně
+        root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build(self):
         # dvoupanelový layout: VLEVO stavebnice cvičení, VPRAVO klaviatura/náhled (škáluje)
@@ -214,6 +220,75 @@ class App:
         line = build.generate(H, density=density, seed=self.seed.get(), approach=approach)
         _, landings = build.guide_path(H)
         return H, landings, line, density
+
+    # ---------- serializace nastavení do JSON (jako prototyp) ----------
+    PERSIST = ["lesson", "root_note", "mode", "pattern", "chords", "density", "approach",
+               "color", "bpm", "seed", "voicing", "port", "flip"]
+
+    def _state_dict(self):
+        return {k: getattr(self, k).get() for k in self.PERSIST if hasattr(self, k)}
+
+    def _save_state(self):
+        self._save_job = None
+        try:
+            with open(self.state_path, "w", encoding="utf-8") as fh:
+                json.dump(self._state_dict(), fh, ensure_ascii=False, indent=2)
+        except Exception:
+            traceback.print_exc()
+
+    def _load_state(self):
+        try:
+            with open(self.state_path, encoding="utf-8") as fh:
+                d = json.load(fh)
+        except Exception:
+            return
+        self._loading = True
+        try:
+            def setv(k):
+                if k in d and hasattr(self, k):
+                    try:
+                        getattr(self, k).set(d[k])
+                    except Exception:
+                        pass
+            setv("root_note"); setv("mode")
+            self._refresh_patterns()                  # nabídka postupů dle načtené tonality
+            for k in ("pattern", "chords", "density", "approach", "color", "bpm",
+                      "seed", "voicing", "port", "flip", "lesson"):
+                setv(k)
+            if "lesson" in d:
+                self.explain.set(lessons.by_title(self.lesson.get())["explain"])
+            self.status.set("Obnoveno z minula.")
+        finally:
+            self._loading = False
+        self._draw_only()                             # ukaž obnovenou progresi v náhledu
+
+    def _draw_only(self):
+        """Vygeneruj + vykresli náhled BEZ přehrání (po startu / změně lekce)."""
+        try:
+            H, landings, line, _ = self._gen()
+            self._draw_state = (H, landings, line)
+            self.root.after(0, self._redraw)
+        except Exception:
+            traceback.print_exc()
+
+    def _register_traces(self):
+        for k in self.PERSIST:
+            if hasattr(self, k):
+                getattr(self, k).trace_add("write", lambda *_: self._schedule_save())
+
+    def _schedule_save(self):
+        if self._loading:
+            return
+        if self._save_job:
+            try:
+                self.root.after_cancel(self._save_job)
+            except Exception:
+                pass
+        self._save_job = self.root.after(400, self._save_state)
+
+    def _on_close(self):
+        self._save_state()
+        self.root.destroy()
 
     def _on_canvas_resize(self, event):
         if self._draw_state is None:
