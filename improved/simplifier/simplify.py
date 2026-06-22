@@ -154,6 +154,55 @@ def render_simplified(a, path, bpm=120, tpb=480, **simp):
     return path
 
 
+def segment_phrases(a, min_notes=4, max_beats=8):
+    """Rozřež CELOU skladbu na souvislé fráze (výukové jednotky) -> [(t0, t1, changes)].
+    Hook pro voice/: každá fráze = krátká progrese + linka, co tabule umí ukázat."""
+    from .licks import melodic_phrases
+    mel = M.melody_line(a.notes, a.grid)
+    to_sec = _to_sec_fn(a.grid.beats)
+    out = []
+    for ph in melodic_phrases(mel, min_notes=min_notes, max_beats=max_beats):
+        b0, b1 = ph[0][0], ph[-1][0] + ph[-1][1]
+        syms = [C.sym(s.root, s.qual) for s in a.spans
+                if s.start < b1 and s.start + s.nbeats > b0]
+        out.append((to_sec(b0), to_sec(b1), " ".join(syms)))
+    return out
+
+
+def segment_progressions(a, max_beats=12):
+    """Rozřež skladbu na chunky podle PROGRESÍ -- hranice po harmonickém ROZVAZU
+    (V->I: předchozí dominanta, kořen o kvintu níž, stabilní akord). Dlouhé úseky
+    bez rozvazu se rozpůlí. -> [(t0, t1, changes)] (díky J. -- chunky na progresích)."""
+    spans = a.spans
+    if not spans:
+        return []
+    cuts = [0]
+    for i in range(1, len(spans)):
+        p, s = spans[i - 1], spans[i]
+        if p.qual == "7" and (p.root - s.root) % 12 == 7 and s.qual in ("maj7", "6", "m7", "m6", "mmaj7"):
+            cuts.append(i + 1)               # konec chunku ZA rozvazovým akordem
+    if cuts[-1] != len(spans):
+        cuts.append(len(spans))
+    cuts = sorted(set(cuts))
+    # rozpůl příliš dlouhé chunky (bez rozvazu) na hranici spanu blízko středu
+    final = [cuts[0]]
+    for k in range(1, len(cuts)):
+        si, ei = final[-1], cuts[k]
+        while spans[ei - 1].start + spans[ei - 1].nbeats - spans[si].start > max_beats and ei - si > 1:
+            mid = si + (ei - si) // 2
+            final.append(mid); si = mid
+        final.append(ei)
+    final = sorted(set(final))
+    chunks = []
+    for k in range(len(final) - 1):
+        si, ei = final[k], final[k + 1] - 1
+        if ei < si:
+            continue
+        changes = " ".join(C.sym(spans[j].root, spans[j].qual) for j in range(si, ei + 1))
+        chunks.append((spans[si].t0, spans[ei].t1, changes))
+    return chunks
+
+
 def build_simplified(slice_dir, out_dir):
     """Projede složku slices -> zjednodušené MIDI ve VŠECH obtížnostech (korpus)."""
     import os, glob

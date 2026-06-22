@@ -275,7 +275,30 @@ def lib_demo(json_path, n=12, port=PORT):
 if __name__ == "__main__":
     mode = sys.argv[1]
     path = sys.argv[2]
-    if mode == "simplify":
+    if mode == "segment":
+        from . import simplify as S, analyze as A
+        a = A.from_file(path)
+        n = int(sys.argv[3]) if len(sys.argv) > 3 else 8
+        method = sys.argv[4] if len(sys.argv) > 4 else "prog"
+        level = sys.argv[5] if len(sys.argv) > 5 else "simplified1"
+        port = sys.argv[6] if len(sys.argv) > 6 else PORT
+        segs = (S.segment_progressions(a) if method == "prog" else S.segment_phrases(a))
+        segs = segs[1:]                                  # první frázi (intro/ad-lib) vyhodit
+        print(f"segmentů={len(segs)} (metoda={method}, intro pryč); hraju prvních {n} ({level}) přes '{port}':")
+        ev = []
+        base = 0.5
+        for i, (t0, t1, ch) in enumerate(segs[:n]):
+            print(f"  #{i:>2} {t0:6.1f}-{t1:5.1f}s ({t1 - t0:4.1f}s)  {ch}")
+            for _ in range(2):                          # 2 kliky = nová fráze
+                ev.append((base, mido.Message("note_on", note=103, velocity=110, channel=0)))
+                ev.append((base + 0.12, mido.Message("note_off", note=103, velocity=0, channel=0))); base += 0.4
+            base += 1.5                                  # ticho po klicích -> oddělit od fráze
+            for t, m in S.simplified_events(a, t0, t1, **S.LEVELS[level]):
+                ev.append((base + (t - t0), m.copy(channel=0)))
+            base += (t1 - t0) + 5.0                      # mezera mezi frázemi (na posouzení)
+        play_events(ev, port)
+        print("hotovo")
+    elif mode == "simplify":
         from . import simplify as S, analyze as A
         a = A.from_file(path)
         t0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
