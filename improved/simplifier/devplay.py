@@ -250,12 +250,16 @@ def picks_demo(path, idxs, port=PORT):
 
 
 def lib_demo(json_path, n=12, port=PORT):
-    """Přehraj TOP N licků z knihovny (JSON napříč slices), seřazené podle skóre."""
+    """Přehraj z knihovny: TOP N (číslo) nebo konkrétní indexy v pořadí skóre (např. '0,6')."""
     import json
     with open(json_path) as f:
         lib = json.load(f)["licks"]
-    lib = sorted(lib, key=lambda x: -x.get("score", 0))[:int(n)]
-    print(f"přehraju TOP {len(lib)} z knihovny přes '{port}':")
+    libs = sorted(lib, key=lambda x: -x.get("score", 0))
+    if isinstance(n, str) and "," in n:
+        lib = [libs[int(i)] for i in n.split(",")]
+    else:
+        lib = libs[:int(n)]
+    print(f"přehraju {len(lib)} z knihovny přes '{port}':")
     ev = []
     t = 0.3
     for i, lk in enumerate(lib):
@@ -271,7 +275,24 @@ def lib_demo(json_path, n=12, port=PORT):
 if __name__ == "__main__":
     mode = sys.argv[1]
     path = sys.argv[2]
-    if mode == "lib":
+    if mode == "phrases":
+        from . import licks as L, analyze as A
+        a = A.from_file(path)
+        ph = sorted(L.extract_phrase_licks(a), key=lambda x: -x["score"])
+        n = int(sys.argv[3]) if len(sys.argv) > 3 else 10
+        port = sys.argv[4] if len(sys.argv) > 4 else PORT
+        print(f"FRÁZOVÉ licky — top {min(n, len(ph))} z {len(ph)} přes '{port}':")
+        ev = []
+        t = 0.3
+        for i, lk in enumerate(ph[:n]):
+            print(f"  #{i:>2} sc={lk['score']:.2f} tok={lk['flow']:.2f} cons={lk['cons']:.2f} "
+                  f"n={len(lk['melody']):>2} [{lk['type']:>10}] {lk['changes']}")
+            e, t = _lick_events(lk, t)
+            ev += e
+            t += 1.4
+        play_events(ev, port)
+        print("hotovo")
+    elif mode == "lib":
         n = sys.argv[3] if len(sys.argv) > 3 else 12
         port = sys.argv[4] if len(sys.argv) > 4 else PORT
         lib_demo(path, n, port)

@@ -3,10 +3,11 @@
 Lick = funkční jednotka (functional.find_units) + výřez melodie nad ní, vše v
 DOBÁCH relativně k začátku licku -> padne rovnou do voice/ (changes + line).
 """
-import os, json
+import os, re, json
 import numpy as np
+import mido
 from . import analyze, functional, melody as M, chords as C, energy as EN
-from voice.voicings import SCALE, SEV                       # chord-scales + akordové tóny z voice/
+from voice.voicings import SCALE, SEV, voicing_for          # chord-scales + akordové tóny + voicingy
 
 
 def _scale_pcs(symstr):
@@ -164,8 +165,124 @@ def extract_licks(a, min_notes=5, keep_fit=0.7):
     return licks
 
 
+def _classify(sub_spans):
+    """Typ licku dle obsahu akordů (ii-V-I/ii-V/turnaround), jinak 'lick'."""
+    for typ, si, ei in functional.find_units(sub_spans):
+        if ei >= si:
+            return typ
+    return "lick"
+
+
+def melodic_phrases(line, gap_thresh=0.75, max_beats=8, min_notes=5):
+    """Rozsekej melodii na FRÁZE: hranice na pauze (mezera > gap_thresh); příliš
+    dlouhé fráze (> max_beats dob) se dělí v největší vnitřní mezeře."""
+    if len(line) < min_notes:
+        return []
+    raw, cur = [], [line[0]]
+    for prev, note in zip(line, line[1:]):
+        if note[0] - (prev[0] + prev[1]) > gap_thresh:
+            raw.append(cur); cur = [note]
+        else:
+            cur.append(note)
+    raw.append(cur)
+    out = []
+
+    def emit(ph):
+        if len(ph) < 2:
+            return
+        span = ph[-1][0] + ph[-1][1] - ph[0][0]
+        if span <= max_beats or len(ph) < 2 * min_notes:
+            out.append(ph); return
+        gaps = [ph[i + 1][0] - (ph[i][0] + ph[i][1]) for i in range(len(ph) - 1)]
+        mid = len(gaps) / 2.0
+        gi = max(range(len(gaps)), key=lambda i: gaps[i] - 0.02 * abs(i - mid))  # největší mezera, blíž středu
+        emit(ph[:gi + 1]); emit(ph[gi + 1:])
+
+    for ph in raw:
+        emit(ph)
+    return [p for p in out if len(p) >= min_notes]
+
+
+def extract_phrase_licks(a, keep_fit=0.6, min_notes=5):
+    """Frázový detektor: lick = souvislá plynulá fráze nad svou lokální harmonií."""
+    mel = M.melody_line(a.notes, a.grid)
+    spans = a.spans
+    if not mel or not spans:
+        return []
+    from .voices import skyline_split
+    period = float(np.median(np.diff(a.grid.beats)))
+    _mh, har = skyline_split(a.notes)
+    harch = C.chroma_per_beat(har, a.grid.beats, period)
+    E = EN.energy_curve(a.notes, a.grid)
+    licks = []
+    for n, ph in enumerate(melodic_phrases(mel, min_notes=min_notes)):
+        p0, p1 = ph[0][0], ph[-1][0] + ph[-1][1]
+        si = next((k for k, s in enumerate(spans) if s.start + s.nbeats > p0), None)
+        ei = next((k for k in range(len(spans) - 1, -1, -1) if spans[k].start < p1), None)
+        if si is None or ei is None or ei < si:
+            continue
+        start, end = spans[si].start, spans[ei].start + spans[ei].nbeats
+        line = [(round(o - start, 3), round(d, 3), p) for (o, d, p) in ph]
+        # ořez doznívajícího konce
+        ring = 1.0 if (end - start) >= 4 else 0.0
+        trimmed = [t for t in line if t[0] <= (end - start) - ring]
+        if len(trimmed) >= min_notes:
+            line = trimmed
+        if len(line) < min_notes:
+            continue
+        changes = " ".join(C.sym(spans[k].root, spans[k].qual) for k in range(si, ei + 1))
+        cb = [spans[k].nbeats for k in range(si, ei + 1)]
+        fit = melody_fit(changes, cb, line)
+        if fit < keep_fit:
+            continue
+        conf = _chord_conf(a, harch, si, ei)
+        if conf < 0.65:
+            continue
+        flow = flow_score(line)
+        cons = chordtone_consonance(changes, cb, line)
+        sub = min(1.0, max(0.0, (len(line) - 4) / 6.0))
+        lenf = _len_factor(len(line), int(end - start))
+        lvl, arc, _ = EN.shape(E, start, end)
+        typ = _classify(spans[si:ei + 1])
+        kp, km = a.keys[start]
+        licks.append({
+            "id": f"phrase_{n:03d}",
+            "type": typ,
+            "key": C.PC[kp] + ("m" if km == "min" else ""),
+            "changes": changes,
+            "chord_beats": cb,
+            "n_beats": int(end - start),
+            "bpm": round(float(a.grid.bpm), 1),
+            "mel_fit": round(fit, 2),
+            "flow": flow,
+            "cons": round(cons, 2),
+            "chord_conf": round(conf, 2),
+            "energy": round(lvl, 2),
+            "arc": arc,
+            "score": round(0.26 * sub + 0.26 * flow + 0.24 * cons + 0.14 * fit + 0.10 * lenf, 2),
+            "melody": line,
+            "src_t": [round(spans[si].t0, 2), round(spans[ei].t1, 2)],
+        })
+    return licks
+
+
 def extract_from_file(path):
-    return extract_licks(analyze.from_file(path))
+    """Spoj oba: ČISTÉ ii-V-I licky (původní Evans kvalita, + bonus) jako primární;
+    FRÁZOVÉ doplní jen tam, kde se s žádným ii-V-I nepřekrývají (etuda/cizí materiál)."""
+    a = analyze.from_file(path)
+    iv = extract_licks(a)                                    # čisté ii-V-I (kvalita)
+    ph = extract_phrase_licks(a)                             # obecné fráze (pokrytí)
+    for l in iv:
+        l["score"] = round(min(0.99, l["score"] + 0.10), 2)  # funkční kadence = preferuj
+    iv_ranges = [tuple(l["src_t"]) for l in iv]
+    out = list(iv)
+    for l in ph:
+        a0, a1 = l["src_t"]
+        if any(not (a1 <= b0 or a0 >= b1) for b0, b1 in iv_ranges):   # překryv s ii-V-I -> ii-V-I vyhrává
+            continue
+        out.append(l)
+    out.sort(key=lambda x: -x["score"])
+    return out
 
 
 def save_library(licks, out_json):
@@ -173,6 +290,62 @@ def save_library(licks, out_json):
     with open(out_json, "w") as f:
         json.dump({"licks": licks}, f, ensure_ascii=False, indent=1)
     return out_json
+
+
+def _emit(track, ev):
+    """ev = [(tick, msg)] -> seřaď (note_off před note_on na stejném ticku) a zapiš delty."""
+    ev.sort(key=lambda x: (x[0], 0 if x[1].type == "note_off" else 1))
+    last = 0
+    for tick, msg in ev:
+        msg.time = tick - last
+        track.append(msg)
+        last = tick
+
+
+def render_lick_midi(lk, path, bpm=90, tpb=480):
+    """1 lick -> MIDI: stopa MELODIE (ch0, edituješ) + stopa COMP (ch1, kontext)."""
+    mf = mido.MidiFile(ticks_per_beat=tpb)
+    meta = mido.MidiTrack(); mf.tracks.append(meta)
+    meta.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm), time=0))
+    meta.append(mido.MetaMessage("track_name", name=lk["changes"][:60], time=0))
+    # melodie (ch0)
+    mt = mido.MidiTrack(); mf.tracks.append(mt)
+    mt.append(mido.MetaMessage("track_name", name="melody", time=0))
+    mev = []
+    for o, d, p in lk["melody"]:
+        on, off = int(round(o * tpb)), int(round((o + d) * tpb))
+        mev.append((on, mido.Message("note_on", note=p, velocity=96, channel=0)))
+        mev.append((max(off, on + 1), mido.Message("note_off", note=p, velocity=0, channel=0)))
+    _emit(mt, mev)
+    # comp (ch1) -- Evans rootless + voice-leading
+    ct = mido.MidiTrack(); mf.tracks.append(ct)
+    ct.append(mido.MetaMessage("track_name", name="comp", time=0))
+    cev = []; bpos = 0.0; prev = None
+    for symstr, nb in zip(lk["changes"].split(), lk["chord_beats"]):
+        r, q = C.parse_sym(symstr)
+        voiced = voicing_for(r, q, "rootless", prev); prev = voiced
+        on, off = int(round(bpos * tpb)), int(round((bpos + nb) * tpb))
+        for pp in [36 + r % 12] + voiced:
+            cev.append((on, mido.Message("note_on", note=pp, velocity=60, channel=1)))
+            cev.append((off, mido.Message("note_off", note=pp, velocity=0, channel=1)))
+        bpos += nb
+    _emit(ct, cev)
+    mf.save(path)
+    return path
+
+
+def export_library_midi(licks, out_dir, top=None, bpm=90):
+    """Ulož licky jako MIDI (řazené dle skóre, ať se nejlepší edituje první)."""
+    os.makedirs(out_dir, exist_ok=True)
+    ranked = sorted(licks, key=lambda x: -x.get("score", 0))
+    if top:
+        ranked = ranked[:top]
+    for i, lk in enumerate(ranked):
+        ch = re.sub(r"[^\w-]", "", lk["changes"].replace(" ", "-"))[:28]
+        src = re.sub(r"[^\w]", "", lk.get("source", "").replace(".mid", ""))[-10:]
+        name = f"{i:03d}_sc{int(lk.get('score',0)*100):02d}_{ch}_{src}.mid"
+        render_lick_midi(lk, os.path.join(out_dir, name), bpm)
+    return len(ranked)
 
 
 if __name__ == "__main__":
