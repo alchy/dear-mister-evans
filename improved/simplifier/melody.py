@@ -49,6 +49,16 @@ def melody_line(notes, grid, min_dur=0.12, quant=0.25, merge_gap=0.15):
         ob_q = round(ob / quant) * quant
         db_q = max(quant, round(db / quant) * quant)
         out.append((ob_q, db_q, p))
+    # MONOFONIE: kvantizace může složit dva tóny na týž onset -> nech jen vrchní
+    # (lead line je nejvyšší hlas). Jinak legato v simplify vyrobí notu nulové délky.
+    mono = []
+    for ob, db, p in out:
+        if mono and abs(mono[-1][0] - ob) < 1e-9:
+            if p > mono[-1][2]:
+                mono[-1] = (ob, db, p)
+        else:
+            mono.append((ob, db, p))
+    out = mono
     # vyhodit OKTÁVOVÉ GLITCHE: izolovaný tón daleko od OBOU sousedů (skyline chytil bas)
     clean = []
     for i, (ob, db, p) in enumerate(out):

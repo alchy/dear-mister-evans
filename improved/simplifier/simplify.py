@@ -80,11 +80,23 @@ def _harmonize(p, on, off, beat, notes, spans, voices, conf_thr=2.5, window=14):
     return [p] + chosen
 
 
+BASS_FLOOR = 28      # bas nepouštět pod E1 (ochrana basu — viz hand-split, voleno s J.)
+
+
 def simplified_events(a, t0=0.0, t1=1e9, melody_ch=0, comp_ch=1, comp_vel=50, mel_vel=92,
                       kind="root_vl", mel_keep=1.0, mel_voices=1, mel_conf=2.5):
     """-> [(sec, mido.Message)] zjednodušené verze ve výřezu [t0,t1].
     kind=voicing comp; mel_keep=míra melodie; mel_voices=1 jednohlas, 2-3 harmonizovaná (advanced)."""
     to_sec = _to_sec_fn(a.grid.beats)
+    # 1) RH (melodie + harmonizace) NAPŘED -> comp se pak posadí POD současně znějící melodii
+    rh = []
+    for o, d, p in melody_simplify(M.melody_line(a.notes, a.grid), mel_keep):
+        on, off = to_sec(o), to_sec(o + d)
+        if off <= on:
+            continue                          # defensivně: nota nulové/záporné délky -> osiřelý note_off
+        for pp in _harmonize(p, on, off, o, a.notes, a.spans, mel_voices, mel_conf):
+            rh.append((on, off, pp))
+    # 2) comp (LH): rootless voicing + bas, voice-led, posazený POD melodii (ruce se nekříží)
     ev = []
     prev = None
     for s in a.spans:
@@ -95,19 +107,24 @@ def simplified_events(a, t0=0.0, t1=1e9, melody_ch=0, comp_ch=1, comp_vel=50, me
             voiced = [x + 12 for x in voiced]; m += 12
         while m > 70:
             voiced = [x - 12 for x in voiced]; m -= 12
-        prev = voiced
+        prev = voiced                          # voice-leading měříme PŘED posunem pod melodii
+        comp = [36 + s.root % 12] + voiced
+        # posaď celý comp o oktávy pod nejnižší současně znějící melodický tón; bas chráníme dnem
+        lo = min((p for on, off, p in rh if min(off, s.t1) - max(on, s.t0) > 0), default=None)
+        if lo is not None:
+            while max(comp) >= lo and min(comp) - 12 >= BASS_FLOOR:
+                comp = [x - 12 for x in comp]
         if s.t1 < t0 or s.t0 > t1:
             continue
-        for p in [36 + s.root % 12] + voiced:
+        for p in dict.fromkeys(comp):          # dedup: bas může splynout s tónem voicingu
             ev.append((s.t0, mido.Message("note_on", note=p, velocity=comp_vel, channel=comp_ch)))
             ev.append((s.t1, mido.Message("note_off", note=p, velocity=0, channel=comp_ch)))
-    for o, d, p in melody_simplify(M.melody_line(a.notes, a.grid), mel_keep):
-        on, off = to_sec(o), to_sec(o + d)
+    # 3) emit RH (melodie) ve výřezu
+    for on, off, pp in rh:
         if off < t0 or on > t1:
             continue
-        for pp in _harmonize(p, on, off, o, a.notes, a.spans, mel_voices, mel_conf):
-            ev.append((on, mido.Message("note_on", note=pp, velocity=mel_vel, channel=melody_ch)))
-            ev.append((off, mido.Message("note_off", note=pp, velocity=0, channel=melody_ch)))
+        ev.append((on, mido.Message("note_on", note=pp, velocity=mel_vel, channel=melody_ch)))
+        ev.append((off, mido.Message("note_off", note=pp, velocity=0, channel=melody_ch)))
     return ev
 
 
