@@ -111,35 +111,45 @@ def simplified_events(a, t0=0.0, t1=1e9, melody_ch=0, comp_ch=1, comp_vel=50, me
     return ev
 
 
-# Obtížnostní profily (zafixováno s J. poslechem): comp = R-3-5-7 voice-led;
-# beginner = řidší jednohlas; advanced = bohatší + funkční zdvojení reálnými tóny při jistotě.
+# Obtížnostní profily (zafixováno s J. poslechem) -> podadresáře simplified1/2.
+# comp = R-3-5-7 voice-led; simplified1 = řidší jednohlas; simplified2 = bohatší + funkční zdvojení.
 LEVELS = {
-    "beginner": dict(kind="root_vl", mel_keep=0.5, mel_voices=1),
-    "advanced": dict(kind="root_vl", mel_keep=0.85, mel_voices=3, mel_conf=3.8),
+    "simplified1": dict(kind="root_vl", mel_keep=0.5, mel_voices=1),                       # beginner
+    "simplified2": dict(kind="root_vl", mel_keep=0.85, mel_voices=3, mel_conf=3.8),         # advanced
 }
 
 
-def render_simplified(a, path, bpm=120, tpb=480, parts="full", **simp):
-    """Ulož zjednodušenou skladbu jako MIDI. parts: full|melody|harmony; **simp -> simplified_events."""
+def _build_track(name, events, sec2tick):
+    """[(sec, msg)] -> MidiTrack s delta časy (note_off před markerem před note_on)."""
+    prio = {"note_off": 0, "note_on": 2}
+    ev = sorted(((sec2tick(t), prio.get(m.type, 1), i, m) for i, (t, m) in enumerate(events)))
+    tr = mido.MidiTrack()
+    tr.append(mido.MetaMessage("track_name", name=name, time=0))
+    last = 0
+    for tick, _, _, msg in ev:
+        tr.append(msg.copy(time=tick - last))
+        last = tick
+    return tr
+
+
+def render_simplified(a, path, bpm=120, tpb=480, **simp):
+    """Ulož zjednodušený dvouruční MIDI: meta + CHORDS (markery akordů) + RH (melodie)
+    + LH (comp + bas/kořen). Připraveno pro trénink i výukové SW. **simp -> simplified_events."""
     def sec2tick(s):
         return max(0, int(round(s * tpb * bpm / 60.0)))
 
-    tracks = {"full": [("melody", 0), ("comp", 1)],
-              "melody": [("melody", 0)], "harmony": [("comp", 1)]}[parts]
     allev = simplified_events(a, **simp)
     mf = mido.MidiFile(ticks_per_beat=tpb)
     meta = mido.MidiTrack(); mf.tracks.append(meta)
+    meta.append(mido.MetaMessage("track_name", name="meta", time=0))
     meta.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm), time=0))
-    for name, ch in tracks:
-        tr = mido.MidiTrack(); mf.tracks.append(tr)
-        tr.append(mido.MetaMessage("track_name", name=name, time=0))
-        ev = [(sec2tick(t), m) for t, m in allev if m.channel == ch]
-        ev.sort(key=lambda x: (x[0], 0 if x[1].type == "note_off" else 1))
-        last = 0
-        for tick, msg in ev:
-            msg.time = tick - last
-            tr.append(msg)
-            last = tick
+    meta.append(mido.MetaMessage("time_signature", numerator=4, denominator=4, time=0))
+    # CHORDS: marker s názvem akordu (+ bas = kořen) na každé změně -> čitelná progrese
+    chordev = [(s.t0, mido.MetaMessage("marker", text=f"{C.sym(s.root, s.qual)}/{C.PC[s.root % 12]}"))
+               for s in a.spans]
+    mf.tracks.append(_build_track("chords", chordev, sec2tick))
+    mf.tracks.append(_build_track("RH (melody)", [(t, m) for t, m in allev if m.channel == 0], sec2tick))
+    mf.tracks.append(_build_track("LH (comp+bass)", [(t, m) for t, m in allev if m.channel == 1], sec2tick))
     mf.save(path)
     return path
 
@@ -148,19 +158,20 @@ def build_simplified(slice_dir, out_dir):
     """Projede složku slices -> zjednodušené MIDI ve VŠECH obtížnostech (korpus)."""
     import os, glob
     from . import analyze
-    os.makedirs(out_dir, exist_ok=True)
+    for lvl in LEVELS:
+        os.makedirs(os.path.join(out_dir, lvl), exist_ok=True)
     n = 0
     for p in sorted(glob.glob(os.path.join(slice_dir, "*.mid"))):
         base = os.path.basename(p).replace(".mid", "")
         try:
             a = analyze.from_file(p)
             for lvl, params in LEVELS.items():
-                render_simplified(a, os.path.join(out_dir, f"{base}__{lvl}.mid"), **params)
+                render_simplified(a, os.path.join(out_dir, lvl, f"{base}.mid"), **params)
             print(f"  {base:>18}: {len(a.spans):>3} akordů -> {'/'.join(LEVELS)}")
             n += 1
         except Exception as e:
             print(f"  {base:>18}: CHYBA {type(e).__name__}: {e}")
-    print(f"\nhotovo: {n} skladeb × {len(LEVELS)} úrovní -> {out_dir}")
+    print(f"\nhotovo: {n} skladeb -> {out_dir}/{{{','.join(LEVELS)}}}")
     return n
 
 
