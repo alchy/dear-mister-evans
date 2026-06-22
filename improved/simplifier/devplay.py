@@ -275,7 +275,17 @@ def lib_demo(json_path, n=12, port=PORT):
 if __name__ == "__main__":
     mode = sys.argv[1]
     path = sys.argv[2]
-    if mode == "phrases":
+    if mode == "simplify":
+        from . import simplify as S, analyze as A
+        a = A.from_file(path)
+        t0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
+        t1 = float(sys.argv[4]) if len(sys.argv) > 4 else t0 + 40.0
+        port = sys.argv[5] if len(sys.argv) > 5 else PORT
+        ev = [(t - t0, m.copy(channel=0)) for t, m in S.simplified_events(a, t0, t1)]   # ch0 pro VST
+        print(f"zjednodušený Evans {t0}-{t1}s ({len(a.spans)} akordů) přes '{port}'…")
+        play_events(ev, port)
+        print("hotovo")
+    elif mode == "phrases":
         from . import licks as L, analyze as A
         a = A.from_file(path)
         ph = sorted(L.extract_phrase_licks(a), key=lambda x: -x["score"])
