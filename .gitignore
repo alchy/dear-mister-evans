@@ -29,3 +29,9 @@ Thumbs.db
 jazz_gui_state.json
 jazz_feedback.json
 voice_gui_state.json
+
+# Levine OCR korpus — text knihy ani modelové váhy NIKDY do gitu (autorská práva)
+**/Levine Corpus/**
+**/_work/**
+**/_work_spike/**
+*.gguf
