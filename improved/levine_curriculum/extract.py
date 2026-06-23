@@ -1,5 +1,5 @@
 """extract -- MAP krok: z jednoho okna textu vytáhne koncepty (Ollama, vlastní slova)."""
-from .concept import slugify
+from .concept import slugify, norm_level
 
 MAP_PROMPT = (
     "You are building a jazz-piano learning curriculum. From the passage below, "
@@ -24,7 +24,7 @@ def extract_concepts(chunk, client):
             "id": slugify(name),
             "name": name,
             "summary": (c.get("summary") or "").strip(),
-            "level": (c.get("level") or "review"),
+            "level": norm_level(c.get("level")),
             "prerequisites": [slugify(p) for p in c.get("prerequisites", []) if (p or "").strip()],
             "keywords": [k for k in c.get("keywords", []) if (k or "").strip()],
             "source_refs": [{"chapter": chunk.chapter, "pages": chunk.pages}],

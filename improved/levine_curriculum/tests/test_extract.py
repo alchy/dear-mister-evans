@@ -24,5 +24,10 @@ class TestExtract(unittest.TestCase):
         out = extract_concepts(Chunk("t", "c", ""), client)
         self.assertEqual(out, [])
 
+    def test_normalizes_level_case(self):
+        client = FakeClient({"concepts": [{"name": "X", "level": "Intermediate"}]})
+        out = extract_concepts(Chunk("t", "c", ""), client)
+        self.assertEqual(out[0]["level"], "intermediate")
+
 if __name__ == "__main__":
     unittest.main()
