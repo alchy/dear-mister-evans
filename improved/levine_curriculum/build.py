@@ -44,7 +44,7 @@ def main():
     ap.add_argument("corpus_dir")
     ap.add_argument("out_dir")
     ap.add_argument("--work", required=True)
-    ap.add_argument("--model", default="qwen3.6:27b-mlx")
+    ap.add_argument("--model", default="gemma4:latest")  # A/B: qwen 27b OOM na 24GB, gemma4 funguje
     ap.add_argument("--num-ctx", type=int, default=8192)
     ap.add_argument("--max-chars", type=int, default=4000)
     ap.add_argument("--overlap", type=int, default=400)
